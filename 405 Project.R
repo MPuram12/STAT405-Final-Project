@@ -71,218 +71,80 @@ epa_chart <- offense %>%
 epa_chart
 
 
-####### Without GGPLOT EPA Chart #########
-
-# Sample offense and defense data (replace with your actual data)
-off_epa <- epa_data$off_epa
-def_epa <- epa_data$def_epa
-team_names <- epa_data$posteam  # Assuming this column contains team abbreviations
-
-# Set up the plotting area (this initializes the plot)
-plot(off_epa, def_epa, 
-     xlab = "Offense EPA/play", 
-     ylab = "Defense EPA/play", 
-     main = "NFL Offensive and Defensive EPA per Play 1999-2024",
-     pch = 16,  # Use solid circle to plot points
-     col = "blue",  # Color of points
-     asp = 16/9,  # Set aspect ratio
-     xlim = range(off_epa, na.rm = TRUE),
-     ylim = range(def_epa, na.rm = TRUE)
-)
-
-# Now add diagonal lines (after plot is initialized)
-slopes <- c(.4, .3, .2, .1, 0, -.1, -.2, -.3)
-for (i in seq_along(slopes)) {
-  abline(a = slopes[i], b = -1.5, col = "gray", lty = "dotted", lwd = 0.5)
-}
-
-# Add horizontal and vertical reference lines (after plot is initialized)
-abline(h = mean(off_epa, na.rm = TRUE), col = "red", lty = "dashed")
-abline(v = mean(def_epa, na.rm = TRUE), col = "red", lty = "dashed")
-
-# Label the points with team names
-text(off_epa, def_epa, labels = team_names, pos = 4, cex = 0.8, col = "black")
-
-# Reverse y-axis (optional: similar to scale_y_reverse in ggplot)
-axis(2, at = rev(pretty(def_epa)))  # Flip the y-axis ticks and labels
-
-# Add additional text and captions
-mtext("Data: @nflfastR", side = 1, line = 3)
-title("NFL Offensive and Defensive EPA per Play 1999-2024", line = 0.5, font = 2, cex.main = 1.2)
-
-
 
 
 
 library(vip)
 
 
-# # Load in play-by-play data
-# first_pbp <- load_pbp(1999:2010)
-# second_pbp <- load_pbp(2011:2024)
-# 
-# # Getting just 4th downs
-# fourth_downs_first <- first_pbp |> 
-#   filter(down == 4, !is.na(play_type))
-# 
-# fourth_downs_first <- fourth_downs_first %>%
-#   filter(!is.na(yardline_100) & !is.na(ydstogo) & !is.na(wp))
-# 
-# # See what usually happens on 4th down
-# fourth_downs_first |> 
-#   group_by(play_type) |> 
-#   tally(sort = T) |> 
-#   print(n = 10)
-# 
-# # Creating an indicator variable
-# fourth_downs_first <- fourth_downs_first |> 
-#   mutate(went_for_it = ifelse(play_type %in% c("pass", "run"), 1, 0))
-# 
-# # Seeing which variables correlate with going for it
-# fourth_downs_first |> 
-#   group_by(ydstogo) |> 
-#   summarize(count = n(), 
-#             went_for_it_rate = mean(went_for_it)) |> 
-#   filter(count >= 5) |> 
-#   ggplot(aes(x = ydstogo, y = went_for_it_rate)) +
-#   geom_bar(aes(fill = went_for_it_rate), stat = "identity") +
-#   theme_minimal()
-# 
-# fourth_downs_first |> 
-#   group_by(yardline_100) |> 
-#   summarize(count = n(), 
-#             went_for_it_rate = mean(went_for_it)) |> 
-#   filter(count >= 5) |> 
-#   ggplot(aes(x = yardline_100, y = went_for_it_rate)) +
-#   geom_bar(aes(fill = went_for_it_rate), stat = "identity") +
-#   theme_minimal()
-# 
-# fourth_downs_first |> 
-#   group_by(ydstogo) |> 
-#   summarize(went_for_it_rate = mean(went_for_it)) |> 
-#   ggplot(aes(x = ydstogo, y = went_for_it_rate)) +
-#   geom_bar(stat = "identity") +
-#   theme_minimal()
-# 
-# fourth_downs_first |> 
-#   mutate(wp_rounded = round(wp, 2)) |> 
-#   group_by(wp_rounded) |> 
-#   summarize(count = n(), 
-#             went_for_it_rate = mean(went_for_it)) |> 
-#   ggplot(aes(x = wp_rounded, y = went_for_it_rate)) +
-#   geom_bar(aes(fill = went_for_it_rate), stat = "identity") +
-#   theme_minimal()
-
+# Load in play-by-play data
 first_pbp <- load_pbp(1999:2010)
 second_pbp <- load_pbp(2011:2024)
 
 # Getting just 4th downs
-fourth_downs_first <- first_pbp |> 
+fourth_downs_first <- first_pbp |>
   filter(down == 4, !is.na(play_type))
 
 fourth_downs_first <- fourth_downs_first %>%
   filter(!is.na(yardline_100) & !is.na(ydstogo) & !is.na(wp))
 
 # See what usually happens on 4th down
-fourth_downs_first |> 
-  group_by(play_type) |> 
-  tally(sort = T) |> 
+fourth_downs_first |>
+  group_by(play_type) |>
+  tally(sort = T) |>
   print(n = 10)
 
 # Creating an indicator variable
-fourth_downs_first <- fourth_downs_first |> 
+fourth_downs_first <- fourth_downs_first |>
   mutate(went_for_it = ifelse(play_type %in% c("pass", "run"), 1, 0))
 
 # Seeing which variables correlate with going for it
-ydstogo_summary <- fourth_downs_first %>%
-  group_by(ydstogo) %>%
+fourth_downs_first |>
+  group_by(ydstogo) |>
   summarize(count = n(),
-            went_for_it_rate = mean(went_for_it)) %>%
-  filter(count >= 5)
+            went_for_it_rate = mean(went_for_it)) |>
+  filter(count >= 5) |>
+  ggplot(aes(x = ydstogo, y = went_for_it_rate)) +
+  geom_bar(aes(fill = went_for_it_rate), stat = "identity") +
+  theme_minimal()
 
-
-barplot(ydstogo_summary$went_for_it_rate,
-        names.arg = ydstogo_summary$ydstogo,
-        col = heat.colors(length(ydstogo_summary$went_for_it_rate)), # Color fill
-        xlab = "Yards to Go",
-        ylab = "Went For It Rate",
-        main = "Went For It Rate by Yards to Go",
-        border = "white")
-
-# Summarize the data
-yardline_summary <- fourth_downs_first %>%
-  group_by(yardline_100) %>%
+fourth_downs_first |>
+  group_by(yardline_100) |>
   summarize(count = n(),
-            went_for_it_rate = mean(went_for_it)) %>%
-  filter(count >= 5)
+            went_for_it_rate = mean(went_for_it)) |>
+  filter(count >= 5) |>
+  ggplot(aes(x = yardline_100, y = went_for_it_rate)) +
+  geom_bar(aes(fill = went_for_it_rate), stat = "identity") +
+  theme_minimal()
 
-# Create the barplot
-barplot(yardline_summary$went_for_it_rate,
-        names.arg = yardline_summary$yardline_100,
-        col = heat.colors(length(yardline_summary$went_for_it_rate)), # Color fill
-        xlab = "Yardline",
-        ylab = "Went For It Rate",
-        main = "Went For It Rate by Yardline",
-        border = "white")
+fourth_downs_first |>
+  group_by(ydstogo) |>
+  summarize(went_for_it_rate = mean(went_for_it)) |>
+  ggplot(aes(x = ydstogo, y = went_for_it_rate)) +
+  geom_bar(stat = "identity") +
+  theme_minimal()
 
-# Summarize the data
-ydstogo_simple <- fourth_downs_first %>%
-  group_by(ydstogo) %>%
-  summarize(went_for_it_rate = mean(went_for_it))
-
-# Create the barplot
-barplot(ydstogo_simple$went_for_it_rate,
-        names.arg = ydstogo_simple$ydstogo,
-        col = "skyblue",
-        xlab = "Yards to Go",
-        ylab = "Went For It Rate",
-        main = "Went For It Rate by Yards to Go (Simple)",
-        border = "white")
-
-# Summarize the data
-wp_summary <- fourth_downs_first %>%
-  mutate(wp_rounded = round(wp, 2)) %>%
-  group_by(wp_rounded) %>%
+fourth_downs_first |>
+  mutate(wp_rounded = round(wp, 2)) |>
+  group_by(wp_rounded) |>
   summarize(count = n(),
-            went_for_it_rate = mean(went_for_it))
+            went_for_it_rate = mean(went_for_it)) |>
+  ggplot(aes(x = wp_rounded, y = went_for_it_rate)) +
+  geom_bar(aes(fill = went_for_it_rate), stat = "identity") +
+  theme_minimal()
 
-# Create the barplot
-barplot(wp_summary$went_for_it_rate,
-        names.arg = wp_summary$wp_rounded,
-        col = heat.colors(length(wp_summary$went_for_it_rate)), # Color fill
-        xlab = "Win Probability (Rounded)",
-        ylab = "Went For It Rate",
-        main = "Went For It Rate by Win Probability",
-        border = "white")
-
-
-# Making a logistic regression model
-log_fourth <- glm(went_for_it ~ yardline_100 + ydstogo + wp, 
-                  data = fourth_downs_first)
-
-# Getting the summary
-summary(log_fourth)
-
-# Getting the variable importance
-vip(log_fourth)
-
-# Accounting for interaction effects
-log_fourth_co <- glm(went_for_it ~ (yardline_100 + ydstogo + wp)^2, 
-                     data = fourth_downs_first)
-
-summary(log_fourth_co)
 
 # Checking the prediction probabilities
-fourth_downs_first |> 
-  mutate(pred_prob = log_fourth$fitted.values) |> 
-  ggplot(aes(x = ydstogo)) +
-  geom_line(aes(y = pred_prob), color = "black", size = 2) +
-  geom_point(aes(y = went_for_it, color = ifelse(went_for_it == 1, "darkgreen", "darkred")), 
-             alpha = 0.3) +
-  scale_color_identity() +
-  theme_minimal() +
-  labs(x = "Yards to Go",
-       y = "Chance Offense Will Go For It (0-1)")
+ fourth_downs_first |> 
+   mutate(pred_prob = log_fourth$fitted.values) |> 
+   ggplot(aes(x = ydstogo)) +
+   geom_line(aes(y = pred_prob), color = "black", size = 2) +
+   geom_point(aes(y = went_for_it, color = ifelse(went_for_it == 1, "darkgreen", "darkred")), 
+              alpha = 0.3) +
+   scale_color_identity() +
+   theme_minimal() +
+   labs(x = "Yards to Go",
+        y = "Chance Offense Will Go For It (0-1)")
 
 # Getting fourth down go's over expected
 fourth_downs_first <- fourth_downs_first |> 
@@ -308,48 +170,39 @@ team_fourth_long <- team_fourth_first |>
                names_to = "type",
                values_to = "value")
 
-# Create the bar chart with ggplot
-ggplot(team_fourth_long, aes(x = posteam, y = value, fill = type)) +
-  geom_bar(stat = "identity", position = "dodge", color = "black") +
-  geom_image(aes(image = team_logo_espn), position = position_dodge(width = 0.9), 
-             size = 0.05, by = "width", asp = 16/9) +
+# # Create the bar chart with ggplot
+# ggplot(team_fourth_long, aes(x = posteam, y = value, fill = type)) +
+#   geom_bar(stat = "identity", position = "dodge", color = "black") +
+#   geom_image(aes(image = team_logo_espn), position = position_dodge(width = 0.9), 
+#              size = 0.05, by = "width", asp = 16/9) +
+#   theme_minimal() +
+#   labs(x = "Teams",
+#        y = "Number of 4th Downs",
+#        title = "Team 4th Down Actual vs Expected Go's",
+#        subtitle = "1999-2010") +
+#   scale_fill_manual(values = c("actual_fourths" = "skyblue", "exp_fourths" = "lightgreen"),
+#                     name = "Type",
+#                     labels = c("Actual 4th Downs", "Expected 4th Downs")) +
+#   theme(axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate team names for readability
+#         legend.position = "top")
+
+
+ggplot(team_fourth_long, aes(x = posteam, y = value, color = type)) + 
+  geom_point(position = position_jitter(width = 0.2), size = 4) +
+  geom_image(aes(image = team_logo_espn), position = position_jitter(width = 0.2), size = 0.05, asp = 16/9) +
   theme_minimal() +
-  labs(x = "Teams",
-       y = "Number of 4th Downs",
-       title = "Team 4th Down Actual vs Expected Go's",
-       subtitle = "1999-2010") +
-  scale_fill_manual(values = c("actual_fourths" = "skyblue", "exp_fourths" = "lightgreen"),
-                    name = "Type",
-                    labels = c("Actual 4th Downs", "Expected 4th Downs")) +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1),  # Rotate team names for readability
+  labs(x = "Teams", 
+       y = "Number of 4th Downs", 
+       title = "Team 4th Down Actual vs Expected Go's", 
+       subtitle = "1999-2010") + 
+  scale_color_manual(values = c("actual_fourths" = "skyblue", "exp_fourths" = "lightgreen"), 
+                     name = "Type", 
+                     labels = c("Actual 4th Downs", "Expected 4th Downs")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
         legend.position = "top")
 
 
-######### Wihtout ggplot Bar Chart ######
-team_names <- team_fourth_first$posteam  # Get team names
-actual_fourths <- team_fourth_first$actual_fourths
-exp_fourths <- team_fourth_first$exp_fourths
 
-# Combine the actual and expected fourth downs into a matrix for the bar plot
-bar_data <- rbind(actual_fourths, exp_fourths)
-
-# Create the bar chart
-barplot(
-  bar_data,
-  beside = TRUE,                          # Place bars side by side
-  names.arg = team_names,                 # Use team names for the x-axis
-  col = c("skyblue", "lightgreen"),       # Set colors for the two categories
-  legend.text = c("Actual 4th Downs", "Expected 4th Downs"),
-  args.legend = list(x = "topright"),     # Position the legend
-  main = "Team 4th Down Actual vs Expected Go's (1999-2010)",  # Main title
-  xlab = "Teams",                         # X-axis label
-  ylab = "Number of 4th Downs",           # Y-axis label
-  las = 2,                                # Rotate x-axis labels for readability
-  ylim = c(0, max(bar_data) + 5)          # Adjust y-axis limits to fit the data
-)
-
-# Add gridlines for visual clarity
-abline(h = seq(0, max(bar_data), by = 5), col = "gray", lty = "dotted")
 
 
 ###################### Making Linear Regression Model ########################
