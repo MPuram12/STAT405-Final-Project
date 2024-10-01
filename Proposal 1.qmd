@@ -1,0 +1,85 @@
+---
+title: "Proposal 1"
+format: pdf
+author: "Names"
+editor: visual
+---
+
+## Proposal One
+
+First proposal of the project
+
+## Graph Presentation
+
+
+```{r, include = FALSE}
+library(tidyverse)
+library(nflfastR)
+library(ggimage)
+library(gt)
+library(ggthemes)
+library(ggrepel)
+library(plotly)
+
+long_pbp <- load_pbp(1999:2024)
+
+
+long_pbp %>%
+  group_by(season) %>%
+  summarise(n = n())
+
+
+long_pbp %>%
+  group_by(play_type) %>%
+  summarise(n = n())
+
+
+qbs <- long_pbp %>%
+  filter(season_type == "REG", !is.na(epa)) %>%
+  group_by(id, name) %>%
+  dplyr::summarise(
+    epa = mean(qb_epa),
+    cpoe = mean(cpoe, na.rm = T),
+    n_dropbacks = sum(pass),
+    n_plays = n(),
+    team = last(posteam)
+  ) %>%
+  ungroup() %>%
+  filter(n_dropbacks > 10 & n_plays > 100)
+
+qbs <- qbs %>%
+  left_join(teams_colors_logos, by = c('team' = 'team_abbr'))
+
+offense <- long_pbp %>%
+  group_by(posteam) %>%
+  summarise(off_epa = mean(epa, na.rm = TRUE))
+
+
+defense <- long_pbp %>%
+  group_by(defteam) %>%
+  summarise(def_epa = mean(epa, na.rm = TRUE))
+
+logos <- teams_colors_logos %>% dplyr::select(team_abbr, team_logo_espn)
+```
+
+
+```{r, echo=FALSE}
+# Sample offense and defense data (replace with your actual data)
+off_epa <- epa_data$off_epa
+def_epa <- epa_data$def_epa
+team_names <- epa_data$posteam  # Assuming this column contains team abbreviations
+
+# Set up the plotting area (this initializes the plot)
+plot(off_epa, def_epa, 
+     xlab = "Offense EPA/play", 
+     ylab = "Defense EPA/play", 
+     main = "NFL Offensive and Defensive EPA per Play 1999-2024",
+     pch = 16,  # Use solid circle to plot points
+     col = "blue",  # Color of points
+     asp = 16/9,  # Set aspect ratio
+     xlim = range(off_epa, na.rm = TRUE),
+     ylim = range(def_epa, na.rm = TRUE)
+)
+```
+
+The `echo: false` option disables the printing of code (only output is displayed).
