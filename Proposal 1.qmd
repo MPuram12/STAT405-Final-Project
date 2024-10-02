@@ -11,25 +11,28 @@ First proposal of the project
 
 Graph Presentation
 
-{r, include = FALSE} library(tidyverse) library(nflfastR) library(ggimage) library(gt) library(ggthemes) library(ggrepel) library(plotly) library(vip)
+```{r, include = FALSE} 
+library(tidyverse) library(nflfastR) library(ggimage) library(gt) library(ggthemes) library(ggrepel) library(plotly) library(vip)
 
-long_pbp \<- load_pbp(1999:2024)
+long_pbp <- load_pbp(1999:2024)
 
 long_pbp %\>% group_by(season) %\>% summarise(n = n())
 
 long_pbp %\>% group_by(play_type) %\>% summarise(n = n())
 
-qbs \<- long_pbp %\>% filter(season_type == "REG", !is.na(epa)) %\>% group_by(id, name) %\>% dplyr::summarise( epa = mean(qb_epa), cpoe = mean(cpoe, na.rm = T), n_dropbacks = sum(pass), n_plays = n(), team = last(posteam) ) %\>% ungroup() %\>% filter(n_dropbacks \> 10 & n_plays \> 100)
+qbs <- long_pbp %\>% filter(season_type == "REG", !is.na(epa)) %\>% group_by(id, name) %\>% dplyr::summarise( epa = mean(qb_epa), cpoe = mean(cpoe, na.rm = T), n_dropbacks = sum(pass), n_plays = n(), team = last(posteam) ) %\>% ungroup() %\>% filter(n_dropbacks \> 10 & n_plays \> 100)
 
-qbs \<- qbs %\>% left_join(teams_colors_logos, by = c('team' = 'team_abbr'))
+qbs <- qbs %\>% left_join(teams_colors_logos, by = c('team' = 'team_abbr'))
 
-offense \<- long_pbp %\>% group_by(posteam) %\>% summarise(off_epa = mean(epa, na.rm = TRUE))
+offense <- long_pbp %\>% group_by(posteam) %\>% summarise(off_epa = mean(epa, na.rm = TRUE))
 
-defense \<- long_pbp %\>% group_by(defteam) %\>% summarise(def_epa = mean(epa, na.rm = TRUE))
+defense <- long_pbp %\>% group_by(defteam) %\>% summarise(def_epa = mean(epa, na.rm = TRUE))
 
-logos \<- teams_colors_logos %\>% dplyr::select(team_abbr, team_logo_espn)
+logos <- teams_colors_logos %\>% dplyr::select(team_abbr, team_logo_espn)
+```
 
-{r, echo = FALSE} \# Sample offense and defense data (replace with your actual data) offense \<- offense %\>% filter(!is.na(posteam) & posteam != "") defense \<- defense %\>% filter(!is.na(defteam) & defteam != "") off_epa \<- offense$off_epa def_epa <- defense$def_epa team_names \<- offense\$posteam \# Assuming this column contains team abbreviations
+```{r, echo = FALSE} 
+\# Sample offense and defense data (replace with your actual data) offense \<- offense %\>% filter(!is.na(posteam) & posteam != "") defense \<- defense %\>% filter(!is.na(defteam) & defteam != "") off_epa \<- offense$off_epa def_epa <- defense$def_epa team_names \<- offense\$posteam \# Assuming this column contains team abbreviations
 
 # Set up the plotting area (this initializes the plot)
 
@@ -46,14 +49,16 @@ abline(h = mean(off_epa, na.rm = TRUE), col = "red", lty = "dashed") abline(v = 
 # Label the points with team names
 
 text(off_epa, def_epa, labels = team_names, pos = 4, cex = 0.8, col = "black")
+```
 
-{r, echo = FALSE} \## Filtering Data for future plots first_pbp \<- load_pbp(1999:2010) second_pbp \<- load_pbp(2011:2024)
+```{r, echo = FALSE} 
+\## Filtering Data for future plots first_pbp \<- load_pbp(1999:2010) second_pbp \<- load_pbp(2011:2024)
 
 # Getting just 4th downs
 
-fourth_downs_first \<- first_pbp \|\> filter(down == 4, !is.na(play_type))
+fourth_downs_first <- first_pbp \|\> filter(down == 4, !is.na(play_type))
 
-fourth_downs_first \<- fourth_downs_first %\>% filter(!is.na(yardline_100) & !is.na(ydstogo) & !is.na(wp))
+fourth_downs_first <- fourth_downs_first %\>% filter(!is.na(yardline_100) & !is.na(ydstogo) & !is.na(wp))
 
 # See what usually happens on 4th down
 
@@ -61,33 +66,38 @@ fourth_downs_first \|\> group_by(play_type) \|\> tally(sort = T) \|\> print(n = 
 
 # Creating an indicator variable
 
-fourth_downs_first \<- fourth_downs_first \|\> mutate(went_for_it = ifelse(play_type %in% c("pass", "run"), 1, 0))
-
+fourth_downs_first <- fourth_downs_first \|\> mutate(went_for_it = ifelse(play_type %in% c("pass", "run"), 1, 0))
+```
 Yards to go bar plot
 
-{r, echo = FALSE} ydstogo_summary \<- fourth_downs_first %\>% group_by(ydstogo) %\>% summarize(count = n(), went_for_it_rate = mean(went_for_it)) %\>% filter(count \>= 5)
+```{r, echo = FALSE} 
+ydstogo_summary <- fourth_downs_first %\>% group_by(ydstogo) %\>% summarize(count = n(), went_for_it_rate = mean(went_for_it)) %\>% filter(count \>= 5)
 
 barplot(ydstogo_summary$went_for_it_rate, names.arg = ydstogo_summary$ydstogo, col = heat.colors(length(ydstogo_summary\$went_for_it_rate)), \# Color fill xlab = "Yards to Go", ylab = "Went For It Rate", main = "Went For It Rate by Yards to Go", border = "white")
+```
 
 4th down by yardline
 
-{r, echo = FALSE} yardline_summary \<- fourth_downs_first %\>% group_by(yardline_100) %\>% summarize(count = n(), went_for_it_rate = mean(went_for_it)) %\>% filter(count \>= 5)
+```{r, echo = FALSE} 
+yardline_summary \<- fourth_downs_first %\>% group_by(yardline_100) %\>% summarize(count = n(), went_for_it_rate = mean(went_for_it)) %\>% filter(count \>= 5)
 
 # Create the barplot
 
 barplot(yardline_summary$went_for_it_rate, names.arg = yardline_summary$yardline_100, col = heat.colors(length(yardline_summary\$went_for_it_rate)), \# Color fill xlab = "Yardline", ylab = "Went For It Rate", main = "Went For It Rate by Yardline", border = "white")
+```
 
 Win Probability
-
-{r, echo = FALSE} \# Summarize the data wp_summary \<- fourth_downs_first %\>% mutate(wp_rounded = round(wp, 2)) %\>% group_by(wp_rounded) %\>% summarize(count = n(), went_for_it_rate = mean(went_for_it))
+```{r, echo = FALSE} 
+\# Summarize the data wp_summary \<- fourth_downs_first %\>% mutate(wp_rounded = round(wp, 2)) %\>% group_by(wp_rounded) %\>% summarize(count = n(), went_for_it_rate = mean(went_for_it))
 
 # Create the barplot
 
 barplot(wp_summary$went_for_it_rate, names.arg = wp_summary$wp_rounded, col = heat.colors(length(wp_summary\$went_for_it_rate)), \# Color fill xlab = "Win Probability (Rounded)", ylab = "Went For It Rate", main = "Went For It Rate by Win Probability", border = "white")
+```
 
 Logistic Regression - Fourth Down Modeling
-
-{r, echo = FALSE} log_fourth \<- glm(went_for_it \~ yardline_100 + ydstogo + wp, data = fourth_downs_first)
+``` {r, echo = FALSE} 
+log_fourth \<- glm(went_for_it \~ yardline_100 + ydstogo + wp, data = fourth_downs_first)
 
 # Getting the summary
 
@@ -102,10 +112,11 @@ vip(log_fourth)
 log_fourth_co \<- glm(went_for_it \~ (yardline_100 + ydstogo + wp)\^2, data = fourth_downs_first)
 
 summary(log_fourth_co)
+```
 
 Predicted Probability of going for it vs yards to go
-
-{r, include = FALSE} fourth_downs_first$pred_prob <- log_fourth$fitted.values
+```{r, include = FALSE} 
+fourth_downs_first$pred_prob <- log_fourth$fitted.values
 
 # Create the initial plot (line plot of pred_prob vs. ydstogo)
 
@@ -120,10 +131,11 @@ points(fourth_downs_first$ydstogo[fourth_downs_first$went_for_it == 0\], fourth_
 # Optional: Add a legend to indicate the color coding
 
 legend("topright", legend = c("Went for it", "Did not go for it"), col = c("darkgreen", "darkred"), pch = 19, bty = "n")
+```
 
-\^ fix this graph lool
-
-{r, include = FALSE} \## 4th down Modeling fourth_downs_first \<- fourth_downs_first \|\> mutate(pred_prob = log_fourth\$fitted.values) \|\> mutate(fourth_oe = went_for_it - pred_prob)
+^fix this graph lool
+```{r, include = FALSE} 
+\## 4th down Modeling fourth_downs_first \<- fourth_downs_first \|\> mutate(pred_prob = log_fourth\$fitted.values) \|\> mutate(fourth_oe = went_for_it - pred_prob)
 
 team_fourth_first \<- fourth_downs_first \|\> filter(season \>= 1999 & season \<= 2010) \|\> group_by(posteam) \|\> summarize(count = n(), exp_fourths = sum(pred_prob), actual_fourths = sum(went_for_it), fourths_oe = sum(fourth_oe)) \|\> left_join(teams_colors_logos, by = c("posteam" = "team_abbr"))
 
@@ -134,12 +146,15 @@ fourth_downs_first \<- fourth_downs_first \|\> mutate(pred_prob = log_fourth\$fi
 team_fourth_first \<- fourth_downs_first \|\> filter(season \>= 1999 & season \<= 2010) \|\> group_by(posteam) \|\> summarize(count = n(), exp_fourths = sum(pred_prob), actual_fourths = sum(went_for_it), fourths_oe = sum(fourth_oe)) \|\> left_join(teams_colors_logos, by = c("posteam" = "team_abbr"))
 
 team_fourth_long \<- team_fourth_first \|\> select(posteam, actual_fourths, exp_fourths, team_logo_espn) \|\> pivot_longer(cols = c(actual_fourths, exp_fourths), names_to = "type", values_to = "value")
+```
 
 4th down actual vs expected
 
-{r, echo = FALSE} ggplot(team_fourth_long, aes(x = posteam, y = value, color = type)) + geom_point(position = position_jitter(width = 0.2), size = 4) + geom_image(aes(image = team_logo_espn), position = position_jitter(width = 0.2), size = 0.05, asp = 16/9) + theme_minimal() + labs(x = "Teams", y = "Number of 4th Downs", title = "Team 4th Down Actual vs Expected Go's", subtitle = "1999-2010") + scale_color_manual(values = c("actual_fourths" = "skyblue", "exp_fourths" = "lightgreen"), name = "Type", labels = c("Actual 4th Downs", "Expected 4th Downs")) + theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "top")
-
+```{r, echo = FALSE} 
+ggplot(team_fourth_long, aes(x = posteam, y = value, color = type)) + geom_point(position = position_jitter(width = 0.2), size = 4) + geom_image(aes(image = team_logo_espn), position = position_jitter(width = 0.2), size = 0.05, asp = 16/9) + theme_minimal() + labs(x = "Teams", y = "Number of 4th Downs", title = "Team 4th Down Actual vs Expected Go's", subtitle = "1999-2010") + scale_color_manual(values = c("actual_fourths" = "skyblue", "exp_fourths" = "lightgreen"), name = "Type", labels = c("Actual 4th Downs", "Expected 4th Downs")) + theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "top")
+```
 \^ make this not ggplot
+
 
 **Boxplot**
 ```{r pressure, echo=FALSE}
