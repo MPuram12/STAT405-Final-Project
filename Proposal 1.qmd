@@ -190,9 +190,11 @@ par(mar = c(7, 4, 4, 2) + 0.1)
 
 #boxplot_obj
 ```
+There is not a huge statistically significant difference in the effeciencies of run plays in different gaps. While inside runs to the tackle and guard are generally safer (small potential for a big loss), they also have a lower potential for a big gain. On the other hand, run plays to the outside have a much larger potential for gain but also a larger potential for a big loss. There's also no notable difference between running to the left and right. 
+
 
 ```{r}
-install.packages("nflreadr")
+#install.packages("nflreadr")
 library(nflreadr)
 library(dplyr)
 data <- load_schedules(seasons = 1999:2023) |>                                              
@@ -209,39 +211,57 @@ team_data <- as.data.frame(team_matrix[, -1])
 names(team_data) <- sort(unique(data$home_team))[-1]
 
 linear_model <- lm(data$result ~ ., data = team_data)
-summary(linear_model)    
+#summary(linear_model)    
 
 team_strength <- data.frame(
   team = names(coef(linear_model))[-1],
   strength = coef(linear_model)[-1]
 )
 
+logistic_model <- glm(data$result > 0 ~ ., data = team_data, family = binomial())
+#summary(logistic_model)
 
 team_strength_2 <- data.frame(
   team = names(coef(logistic_model))[-1],
   strength = coef(logistic_model)[-1]
 )
 
+# Step 1: Extract the top 15 teams from both ordered dataframes
+top_15_model_1 <- team_strength_ordered %>% top_n(15, strength)
+top_15_model_2 <- team_strength_ordered_2 %>% top_n(15, strength)
 
-logistic_model <- glm(data$result > 0 ~ ., data = team_data, family = binomial())
-summary(logistic_model)
+# Step 2: Combine these teams into one dataframe
+combined_teams <- full_join(top_15_model_1, top_15_model_2, by = "team", suffix = c("_model_1", "_model_2"))
 
-win_percentage <- teams_data <- data.frame(
-  team = c("`BAL 2019`", "`NE 2007`", "`SEA 2013`", "`PIT 2004`", "`GB 2011`", "`DEN 2013`", "`NO 2019`", "`KC 2019`", "`STL 2001`", "`SD 2010`", "`SF 2019`", "`CAR 2013`", "`ATL 2016`", "`BUF 2021`", "`LA 2021`", "`OAK 2016`"),
-  win_pct = c(14/16, 1, 13/16, 15/16, 15/16, 13/16, 13/16, 12/16, 14/16, 9/16, 13/16, 12/16, 11/16, 11/17, 12/17, 12/16)
-)
+# Step 3: Fill NA values with 0 or any appropriate value
+combined_teams <- combined_teams %>%
+  mutate(
+    strength_model_1 = ifelse(is.na(strength_model_1), 0, strength_model_1),
+    strength_model_2 = ifelse(is.na(strength_model_2), 0, strength_model_2)
+  )
 
-merged_data <- merge(team_strength, win_percentage, by = c("team"))
-plot(merged_data$strength, merged_data$win_pct, xlab = "Estimated Strength", ylab = "Win Percentage", main = "Estimated Strength vs Win Percentage", pch = 19)
-abline(lm(win_pct ~ strength, data = merged_data), col = "red")
+#combined_teams
 
-text(
-  merged_data$strength,
-  merged_data$win_pct,
-  labels = merged_data$team,
-  pos = 1,
-  cex = 0.3,
-  col = "darkred"
-)
+n <- nrow(combined_teams)
+strength_diff_model_1 <- outer(combined_teams$strength_model_1, combined_teams$strength_model_1, "-")
+strength_diff_model_2 <- outer(combined_teams$strength_model_2, combined_teams$strength_model_2, "-")
 
+create_heatmap_with_legend <- function(matrix, title) {
+  filled.contour(
+    x = 1:n, y = 1:n, z = t(matrix)[, n:1],
+    color.palette = heat.colors,
+    plot.title = title(main = title),
+    plot.axes = {
+      axis(1, at = 1:n, labels = combined_teams$team_season, las = 2, cex.axis = 0.7)
+      axis(2, at = 1:n, labels = rev(combined_teams$team_season), las = 2, cex.axis = 0.7)
+    },
+    xlab = "Teams", ylab = "Teams"
+  )
+}
+
+# Plot heatmaps
+par(mfrow = c(1, 2))  # Plot side by side
+create_heatmap(strength_diff_model_1, "Strength Difference Using Metric 1")
+create_heatmap(strength_diff_model_2, "Strength Difference Using Metric 2")
 ```
+Interpretation: We created two different metrics to assess the strengths of teams in the years 1999 to 2023, and we took the 15 strongest teams using each metric. Then, combining those lists we got a total of 23 teams, and calculated the difference in strengths between every combination of those teams using each metric. We found that in general metric 1 gives more consistent results with regards to the head to head results. 
