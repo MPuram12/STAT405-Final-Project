@@ -1,0 +1,103 @@
+---
+title: "randombullshit2"
+format: pdf
+editor: visual
+---
+
+```{r}
+# Install the packages
+#install.packages(c("tidyverse", "nflfastR", "ggimage", "gt", "ggthemes", "ggrepel", "plotly", "vip"))
+#install.packages('ggforce')
+#install.packages('ggplot2')
+#install.packages('ggalt')
+
+# Load the packages
+library(tidyverse)
+library(nflfastR)
+library(ggimage)
+library(gt)
+library(ggthemes)
+library(ggrepel)
+library(plotly)
+library(vip)
+library(ggforce)
+library(ggplot2)
+library(ggalt)
+```
+
+```{r}
+#long_pbp <- load_pbp(1999:2024)
+#write.csv(long_pbp, '/Users/manik/Downloads/STAT405/temp_storage/long_pbp.csv')
+long_pbp <- read.csv('/Users/manik/Downloads/STAT405/temp_storage/long_pbp.csv')
+```
+
+```{r}
+tbrady_passes <- long_pbp %>%
+  filter(passer == 'T.Brady' & 
+         play_type != 'no_play' & 
+         incomplete_pass != 1 & 
+         interception != 1 & 
+         !is.na(air_yards) & 
+         !is.na(yards_after_catch))
+
+
+tbrady_passes <- tbrady_passes %>%
+  arrange(desc(receiver_id))
+
+top_receivers <- tbrady_passes %>%
+  group_by(receiver_id, receiver) %>%  # Group by receiver_id and receiver
+  summarize(
+    total_yards_gained = sum(yards_gained, na.rm = TRUE),  # Sum yards_gained
+    num_recs = n(),  # Count of plays for each receiver
+    total_air_yards = sum(air_yards, na.rm = TRUE),  # Sum of air yards
+    total_yards_after_catch = sum(yards_after_catch, na.rm = TRUE),  # Sum of yards after catch
+    .groups = 'drop'  # Ungroup after summarizing
+  )
+
+top_receivers <- top_receivers %>%
+  arrange(desc(total_yards_gained)) %>%  # Sort in descending order
+  slice_head(n = 20)  # Take the top 20 rows
+
+player_positions <- data.frame(
+  receiver = c("R.Gronkowski", "J.Edelman", "W.Welker", "M.Evans", "C.Godwin", 
+               "J.White", "R.Moss", "D.Amendola", "A.Hernandez", "C.Hogan", 
+               "D.Branch", "B.Watson", "B.LaFell", "L.Fournette", "K.Faulk", 
+               "S.Vereen", "B.Cooks", "A.Brown", "D.Woodhead", "B.Lloyd"),
+  position = c("TE", "WR", "WR", "WR", "WR", 
+               "RB", "WR", "WR", "TE", "WR", 
+               "WR", "TE", "WR", "RB", "RB", 
+               "RB", "WR", "WR", "RB", "WR")
+)
+
+# Append the positions to the top_receivers dataframe
+top_receivers <- top_receivers %>%
+  left_join(player_positions, by = "receiver")
+
+top_receivers <- top_receivers %>%
+  mutate(
+    air_yards_per_rec = total_air_yards / num_recs,
+    yards_after_catch_per_rec = total_yards_after_catch / num_recs
+  )
+
+top_receivers <- top_receivers %>%
+  filter(!is.na(air_yards_per_rec) & !is.na(yards_after_catch_per_rec))
+
+ggplot(top_receivers, aes(x = air_yards_per_rec, 
+                           y = yards_after_catch_per_rec, 
+                           label = receiver, 
+                           color = position)) +
+  geom_point(size = 3, alpha = 0.7) +
+  geom_text(vjust = -0.5, hjust = 0.5, size = 3.5) +
+  geom_encircle(aes(fill = position), 
+                alpha = 0.1, 
+                color = NA, 
+                expand = 0.08) +
+  labs(
+    title = "Air Yards and Yards After Catch per Reception",
+    x = "Air Yards per Reception",
+    y = "Yards After Catch per Reception"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+```
