@@ -1,0 +1,73 @@
+---
+title: "Proposal 2 - Gale Timeline Graph"
+author: "Gale Gai"
+format: pdf
+editor: visual
+---
+
+## Timeline Graph
+
+```{r, include = FALSE}
+library(tidyverse)
+library(nflfastR)
+library(ggimage)
+library(gt)
+library(ggthemes)
+library(ggrepel)
+library(plotly)
+library(vip)
+library(ggplot2)
+
+long_pbp <- load_pbp(1999:2024)
+
+long_pbp %>%
+  group_by(season) %>%
+  summarise(n = n())
+
+first_pbp <- load_pbp(1999:2010)
+second_pbp <- load_pbp(2011:2024)
+
+```
+
+Graph: Comparison of the percentage of runs compared to pass in the red zone, comparing from before and after 2010. 
+
+```{r, include=FALSE}
+first_red_zone <- first_pbp %>%  
+  filter(ydstogo <= 20, !is.na(play_type), !play_type %in% c("extra_point", "kickoff", "no_play", "qb_kneel","qb_spike")) %>% 
+  select(ydstogo, play_type)
+  
+
+second_red_zone <- second_pbp %>%  
+  filter(ydstogo <= 20, !is.na(play_type), !play_type %in% c("extra_point", "kickoff", "no_play", "qb_kneel","qb_spike")) %>% 
+  select(ydstogo, play_type)
+
+first_red_zone_summary <- first_red_zone %>%
+  group_by(play_type) %>% 
+  summarise(percentage = n() / nrow(first_red_zone) * 100)
+  
+second_red_zone_summary <- second_red_zone %>%
+  group_by(play_type) %>% 
+  summarise(percentage = n() / nrow(first_red_zone) * 100)
+
+red_zone <- data.frame(
+  Period = rep(c("1999-2010", "2010-2024"), each = 2),
+  PlayType = rep(c("Pass", "Run"), times = 2),
+  Percentage = c(first_red_zone_summary$percentage[2], first_red_zone_summary$percentage[4], second_red_zone_summary$percentage[2], second_red_zone_summary$percentage[4]) # respective percentages
+)
+
+```
+
+```{r, echo=FALSE}
+# Plotting the data
+ggplot(red_zone, aes(x = Period, y = Percentage, group = PlayType, color = PlayType)) + 
+  geom_line() +  # Connects points with a line per group
+  geom_point(shape = 17, size = 3) + # Shows the individual points
+  labs(title = "Change in Pass and Run Plays", x = "Time Period", y = "Percentage") +
+  scale_color_manual(name = "", 
+                     values = c("Pass" = "#00ba38", "Run" = "#f8766d")) +
+  theme(panel.grid.minor = element_blank())
+
+```
+
+
+
