@@ -11,8 +11,18 @@ First proposal of the project
 
 Graph Presentation
 
-```{r, include = FALSE} 
-library(tidyverse) library(nflfastR) library(ggimage) library(gt) library(ggthemes) library(ggrepel) library(plotly) library(vip)
+```{r, include = FALSE}
+library(tidyverse) 
+library(nflfastR) 
+library(ggimage) 
+library(gt) 
+library(ggthemes) 
+library(ggrepel) 
+library(plotly) 
+library(vip)
+library(ggforce)
+library(ggplot2)
+library(ggalt)
 
 long_pbp <- load_pbp(1999:2024)
 
@@ -31,7 +41,7 @@ defense <- long_pbp %\>% group_by(defteam) %\>% summarise(def_epa = mean(epa, na
 logos <- teams_colors_logos %\>% dplyr::select(team_abbr, team_logo_espn)
 ```
 
-```{r, echo = FALSE} 
+```{r, echo = FALSE}
 \# Sample offense and defense data (replace with your actual data) offense \<- offense %\>% filter(!is.na(posteam) & posteam != "") defense \<- defense %\>% filter(!is.na(defteam) & defteam != "") off_epa \<- offense$off_epa def_epa <- defense$def_epa team_names \<- offense\$posteam \# Assuming this column contains team abbreviations
 
 # Set up the plotting area (this initializes the plot)
@@ -51,7 +61,7 @@ abline(h = mean(off_epa, na.rm = TRUE), col = "red", lty = "dashed") abline(v = 
 text(off_epa, def_epa, labels = team_names, pos = 4, cex = 0.8, col = "black")
 ```
 
-```{r, echo = FALSE} 
+```{r, echo = FALSE}
 \## Filtering Data for future plots first_pbp \<- load_pbp(1999:2010) second_pbp \<- load_pbp(2011:2024)
 
 # Getting just 4th downs
@@ -68,9 +78,10 @@ fourth_downs_first \|\> group_by(play_type) \|\> tally(sort = T) \|\> print(n = 
 
 fourth_downs_first <- fourth_downs_first \|\> mutate(went_for_it = ifelse(play_type %in% c("pass", "run"), 1, 0))
 ```
+
 Yards to go bar plot
 
-```{r, echo = FALSE} 
+```{r, echo = FALSE}
 ydstogo_summary <- fourth_downs_first %\>% group_by(ydstogo) %\>% summarize(count = n(), went_for_it_rate = mean(went_for_it)) %\>% filter(count \>= 5)
 
 barplot(ydstogo_summary$went_for_it_rate, names.arg = ydstogo_summary$ydstogo, col = heat.colors(length(ydstogo_summary\$went_for_it_rate)), \# Color fill xlab = "Yards to Go", ylab = "Went For It Rate", main = "Went For It Rate by Yards to Go", border = "white")
@@ -78,7 +89,7 @@ barplot(ydstogo_summary$went_for_it_rate, names.arg = ydstogo_summary$ydstogo, c
 
 4th down by yardline
 
-```{r, echo = FALSE} 
+```{r, echo = FALSE}
 yardline_summary \<- fourth_downs_first %\>% group_by(yardline_100) %\>% summarize(count = n(), went_for_it_rate = mean(went_for_it)) %\>% filter(count \>= 5)
 
 # Create the barplot
@@ -87,7 +98,8 @@ barplot(yardline_summary$went_for_it_rate, names.arg = yardline_summary$yardline
 ```
 
 Win Probability
-```{r, echo = FALSE} 
+
+```{r, echo = FALSE}
 \# Summarize the data wp_summary \<- fourth_downs_first %\>% mutate(wp_rounded = round(wp, 2)) %\>% group_by(wp_rounded) %\>% summarize(count = n(), went_for_it_rate = mean(went_for_it))
 
 # Create the barplot
@@ -96,7 +108,8 @@ barplot(wp_summary$went_for_it_rate, names.arg = wp_summary$wp_rounded, col = he
 ```
 
 Logistic Regression - Fourth Down Modeling
-``` {r, echo = FALSE} 
+
+```{r, echo = FALSE}
 log_fourth \<- glm(went_for_it \~ yardline_100 + ydstogo + wp, data = fourth_downs_first)
 
 # Getting the summary
@@ -115,7 +128,8 @@ summary(log_fourth_co)
 ```
 
 Predicted Probability of going for it vs yards to go
-```{r, include = FALSE} 
+
+```{r, include = FALSE}
 fourth_downs_first$pred_prob <- log_fourth$fitted.values
 
 # Create the initial plot (line plot of pred_prob vs. ydstogo)
@@ -133,8 +147,9 @@ points(fourth_downs_first$ydstogo[fourth_downs_first$went_for_it == 0\], fourth_
 legend("topright", legend = c("Went for it", "Did not go for it"), col = c("darkgreen", "darkred"), pch = 19, bty = "n")
 ```
 
-^fix this graph lool
-```{r, include = FALSE} 
+\^fix this graph lool
+
+```{r, include = FALSE}
 \## 4th down Modeling fourth_downs_first \<- fourth_downs_first \|\> mutate(pred_prob = log_fourth\$fitted.values) \|\> mutate(fourth_oe = went_for_it - pred_prob)
 
 team_fourth_first \<- fourth_downs_first \|\> filter(season \>= 1999 & season \<= 2010) \|\> group_by(posteam) \|\> summarize(count = n(), exp_fourths = sum(pred_prob), actual_fourths = sum(went_for_it), fourths_oe = sum(fourth_oe)) \|\> left_join(teams_colors_logos, by = c("posteam" = "team_abbr"))
@@ -150,13 +165,14 @@ team_fourth_long \<- team_fourth_first \|\> select(posteam, actual_fourths, exp_
 
 4th down actual vs expected
 
-```{r, echo = FALSE} 
+```{r, echo = FALSE}
 ggplot(team_fourth_long, aes(x = posteam, y = value, color = type)) + geom_point(position = position_jitter(width = 0.2), size = 4) + geom_image(aes(image = team_logo_espn), position = position_jitter(width = 0.2), size = 0.05, asp = 16/9) + theme_minimal() + labs(x = "Teams", y = "Number of 4th Downs", title = "Team 4th Down Actual vs Expected Go's", subtitle = "1999-2010") + scale_color_manual(values = c("actual_fourths" = "skyblue", "exp_fourths" = "lightgreen"), name = "Type", labels = c("Actual 4th Downs", "Expected 4th Downs")) + theme(axis.text.x = element_text(angle = 45, hjust = 1), legend.position = "top")
 ```
+
 \^ make this not ggplot
 
-
 **Boxplot**
+
 ```{r pressure, echo=FALSE}
 run_plays_with_gap = long_pbp[!is.na(long_pbp$run_gap) |!is.na(long_pbp$run_location), ]
 # Ensure data is numeric and factors are correctly set
@@ -190,8 +206,8 @@ par(mar = c(7, 4, 4, 2) + 0.1)
 
 #boxplot_obj
 ```
-There is not a huge statistically significant difference in the effeciencies of run plays in different gaps. While inside runs to the tackle and guard are generally safer (small potential for a big loss), they also have a lower potential for a big gain. On the other hand, run plays to the outside have a much larger potential for gain but also a larger potential for a big loss. There's also no notable difference between running to the left and right. 
 
+There is not a huge statistically significant difference in the effeciencies of run plays in different gaps. While inside runs to the tackle and guard are generally safer (small potential for a big loss), they also have a lower potential for a big gain. On the other hand, run plays to the outside have a much larger potential for gain but also a larger potential for a big loss. There's also no notable difference between running to the left and right.
 
 ```{r}
 #install.packages("nflreadr")
@@ -264,4 +280,162 @@ par(mfrow = c(1, 2))  # Plot side by side
 create_heatmap(strength_diff_model_1, "Strength Difference Using Metric 1")
 create_heatmap(strength_diff_model_2, "Strength Difference Using Metric 2")
 ```
-Interpretation: We created two different metrics to assess the strengths of teams in the years 1999 to 2023, and we took the 15 strongest teams using each metric. Then, combining those lists we got a total of 23 teams, and calculated the difference in strengths between every combination of those teams using each metric. We found that in general metric 1 gives more consistent results with regards to the head to head results. 
+
+Interpretation: We created two different metrics to assess the strengths of teams in the years 1999 to 2023, and we took the 15 strongest teams using each metric. Then, combining those lists we got a total of 23 teams, and calculated the difference in strengths between every combination of those teams using each metric. We found that in general metric 1 gives more consistent results with regards to the head to head results.
+
+
+```{r}
+tbrady_passes <- long_pbp %>%
+  filter(passer == 'T.Brady' & 
+         play_type != 'no_play' & 
+         incomplete_pass != 1 & 
+         interception != 1 & 
+         !is.na(air_yards) & 
+         !is.na(yards_after_catch))
+
+
+tbrady_passes <- tbrady_passes %>%
+  arrange(desc(receiver_id))
+
+top_receivers <- tbrady_passes %>%
+  group_by(receiver_id, receiver) %>%  # Group by receiver_id and receiver
+  summarize(
+    total_yards_gained = sum(yards_gained, na.rm = TRUE),  # Sum yards_gained
+    num_recs = n(),  # Count of plays for each receiver
+    total_air_yards = sum(air_yards, na.rm = TRUE),  # Sum of air yards
+    total_yards_after_catch = sum(yards_after_catch, na.rm = TRUE),  # Sum of yards after catch
+    .groups = 'drop'  # Ungroup after summarizing
+  )
+
+top_receivers <- top_receivers %>%
+  arrange(desc(total_yards_gained)) %>%  # Sort in descending order
+  slice_head(n = 20)  # Take the top 20 rows
+
+player_positions <- data.frame(
+  receiver = c("R.Gronkowski", "J.Edelman", "W.Welker", "M.Evans", "C.Godwin", 
+               "J.White", "R.Moss", "D.Amendola", "A.Hernandez", "C.Hogan", 
+               "D.Branch", "B.Watson", "B.LaFell", "L.Fournette", "K.Faulk", 
+               "S.Vereen", "B.Cooks", "A.Brown", "D.Woodhead", "B.Lloyd"),
+  position = c("TE", "WR", "WR", "WR", "WR", 
+               "RB", "WR", "WR", "TE", "WR", 
+               "WR", "TE", "WR", "RB", "RB", 
+               "RB", "WR", "WR", "RB", "WR")
+)
+
+# Append the positions to the top_receivers dataframe
+top_receivers <- top_receivers %>%
+  left_join(player_positions, by = "receiver")
+
+top_receivers <- top_receivers %>%
+  mutate(
+    air_yards_per_rec = total_air_yards / num_recs,
+    yards_after_catch_per_rec = total_yards_after_catch / num_recs
+  )
+
+top_receivers <- top_receivers %>%
+  filter(!is.na(air_yards_per_rec) & !is.na(yards_after_catch_per_rec))
+
+ggplot(top_receivers, aes(x = air_yards_per_rec, 
+                           y = yards_after_catch_per_rec, 
+                           label = receiver, 
+                           color = position)) +
+  geom_point(size = 3, alpha = 0.7) +
+  geom_text(vjust = -0.5, hjust = 0.5, size = 3.5) +
+  geom_encircle(aes(fill = position), 
+                alpha = 0.1, 
+                color = NA, 
+                expand = 0.08) +
+  labs(
+    title = "Air Yards and Yards After Catch per Reception",
+    x = "Air Yards per Reception",
+    y = "Yards After Catch per Reception"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+```
+Interperation: Of Tom Brady's receivers, the running backs tended to have more yards after catch per reception, and the least air yards per reception. However, his tight ends and wide receivers tended to have most of their yards in the air and only a little after the catch. Some of his receivers were especially good at getting a lot of air yards.
+```{r}
+all_passes <- long_pbp %>% 
+  filter(play_type == 'pass' &
+         !is.na(passer_id)) %>%
+  mutate(
+    Complete = complete_pass == "1", TRUE, FALSE
+  )
+
+summary_by_passer <- all_passes %>%
+  group_by(passer_id) %>%
+  summarize(
+    passer = first(passer),  # Get the passer corresponding to each passer_id
+    num_plays = n(),
+    total_air_yards = sum(air_yards, na.rm = TRUE),
+    completion_percentage = mean(Complete) * 100
+  )
+
+summary_by_passer <- summary_by_passer %>%
+  mutate(average_air_yards_per_play = total_air_yards / num_plays) %>%
+  filter(num_plays >= 50)
+
+ggplot(summary_by_passer, aes(x = average_air_yards_per_play, y = completion_percentage)) +
+  geom_density_2d_filled() +  # Add filled 2D density contours
+  labs(
+    title = "2D Density Plot of Average Air Yards per Play vs. Completion Percentage",
+    x = "Average Air Yards per Play",
+    y = "Completion Percentage"
+  ) +
+  theme_minimal()
+```
+Most quarterbacks tend to be at 7.5 air yards pre play and a completion percentage at around 55%, and the density is pretty strongly concentrated around that point. There are a small number of quarterbacks who have a very low average air yards per play as well though. 
+
+
+```{r}
+punt_data <- long_pbp %>%
+  filter(play_type == "punt") %>%  # Filter for punts
+  mutate(return_distance = case_when(
+    return_yards >= 0 & return_yards <= 10 ~ "0-10 yards",
+    return_yards > 10 & return_yards <= 20 ~ "11-20 yards",
+    return_yards > 20 & return_yards <= 30 ~ "21-30 yards",
+    return_yards > 30 & return_yards <= 40 ~ "31-40 yards",
+    return_yards > 40 & return_yards <= 50 ~ "41-50 yards",
+    return_yards > 50 ~ "51+ yards",
+    TRUE ~ "No Return")) 
+
+punt_data <- punt_data %>%
+  mutate(time_period = case_when(
+    year >= 1999 & year <= 2005 ~ "1999-2005",
+    year >= 2006 & year <= 2011 ~ "2006-2011",
+    year >= 2012 & year <= 2017 ~ "2012-2017",
+    year >= 2018 & year <= 2024 ~ "2018-2024"
+))
+
+punt_summary_area <- punt_data %>%
+  filter(!is.na(return_yards)) %>%
+  mutate(category = case_when(
+    punt_fair_catch == 1 ~ "Fair Catch",
+    return_yards >= 0 & return_yards <= 10 ~ "0-10 yards",
+    return_yards > 10 & return_yards <= 30 ~ "11-30 yards",
+    return_yards > 30 & return_yards <= 50 ~ "31-50 yards",
+    return_yards > 50 ~ "51+ yards"
+  )) %>%
+  filter(return_distance != "No Return") %>%
+  group_by(year, category) %>%
+  summarize(count = n(), .groups = 'drop') %>%
+  group_by(year) %>%
+  mutate(total_punts = sum(count),
+         percentage = count / total_punts * 100)  # Calculate percentage
+
+ggplot(punt_summary_area, aes(x = as.numeric(year), y = percentage, fill = category)) +
+  geom_area(alpha = 0.8, color = "white", size = 0.5) +  # Stacked area with white outlines
+  scale_fill_manual(values = c("#1b9e77", "#d95f02", "#7570b3", "#e7298a", "#66a61e")) +  # Custom color palette
+  labs(title = "Percentage of Fair Caught and Returned Punts (1999-2024)",
+       subtitle = "Return yardage categories and fair catches over time",
+       x = "Year", y = "Percentage of Punts",
+       fill = "Punt Outcome") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 18, face = "bold"),
+        plot.subtitle = element_text(size = 14),
+        axis.title = element_text(size = 12),
+        legend.position = "bottom",
+        legend.title = element_text(size = 12),
+        legend.text = element_text(size = 10))
+```

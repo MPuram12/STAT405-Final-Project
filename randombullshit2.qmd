@@ -101,3 +101,35 @@ ggplot(top_receivers, aes(x = air_yards_per_rec,
   theme(legend.position = "right")
 
 ```
+Interperation: Of Tom Brady's receivers, the running backs tended to have more yards after catch per reception, and the least air yards per reception. However, his tight ends and wide receivers tended to have most of their yards in the air and only a little after the catch. Some of his receivers were especially good at getting a lot of air yards.
+```{r}
+all_passes <- long_pbp %>% 
+  filter(play_type == 'pass' &
+         !is.na(passer_id)) %>%
+  mutate(
+    Complete = complete_pass == "1", TRUE, FALSE
+  )
+
+summary_by_passer <- all_passes %>%
+  group_by(passer_id) %>%
+  summarize(
+    passer = first(passer),  # Get the passer corresponding to each passer_id
+    num_plays = n(),
+    total_air_yards = sum(air_yards, na.rm = TRUE),
+    completion_percentage = mean(Complete) * 100
+  )
+
+summary_by_passer <- summary_by_passer %>%
+  mutate(average_air_yards_per_play = total_air_yards / num_plays) %>%
+  filter(num_plays >= 50)
+
+ggplot(summary_by_passer, aes(x = average_air_yards_per_play, y = completion_percentage)) +
+  geom_density_2d_filled() +  # Add filled 2D density contours
+  labs(
+    title = "2D Density Plot of Average Air Yards per Play vs. Completion Percentage",
+    x = "Average Air Yards per Play",
+    y = "Completion Percentage"
+  ) +
+  theme_minimal()
+```
+Most quarterbacks tend to be at 7.5 air yards pre play and a completion percentage at around 55%, and the density is pretty strongly concentrated around that point. There are a small number of quarterbacks who have a very low average air yards per play as well though. 
