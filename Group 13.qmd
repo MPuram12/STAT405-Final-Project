@@ -788,7 +788,8 @@ full_names <- c(
   "A.Bradshaw" = "Ahmad Bradshaw",
   "A.Foster" = "Arian Foster",
   "A.Peterson" = "Adrian Peterson",
-  "C.Dillon" = "Corey Dillon"
+  "C.Dillon" = "Corey Dillon",
+  "D.McAllister" = "Deuce McAllister"
 )
 
 ryoe_by_player$rusher_player_name <- full_names
@@ -856,7 +857,7 @@ The plot reveals two prominent clusters of activity. The first cluster appears a
 This scatter plot highlights the relationship between Air Yards per Reception (on the horizontal axis) and Yards After Catch per Reception (on the vertical axis) for players at different positions: Running Backs (RB), Tight Ends (TE), and Wide Receivers (WR). The data points are color-coded by position, with running backs in red, tight ends in green, and wide receivers in blue. The shaded regions around each position group help emphasize clusters of players that share similar statistical profiles, providing insight into their typical play styles.
 
 ```{r, echo = FALSE}
-brady_passes <- long_pbp %>%
+tbrady_passes <- long_pbp %>%
   filter(passer == 'T.Brady' & 
          play_type != 'no_play' & 
          incomplete_pass != 1 & 
