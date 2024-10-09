@@ -398,7 +398,9 @@ punt_data <- long_pbp %>%
     return_yards > 30 & return_yards <= 40 ~ "31-40 yards",
     return_yards > 40 & return_yards <= 50 ~ "41-50 yards",
     return_yards > 50 ~ "51+ yards",
-    TRUE ~ "No Return")) 
+    TRUE ~ "No Return"))
+
+punt_data <- mutate(punt_data, year = substring(game_id, 1, 4))
 
 punt_data <- punt_data %>%
   mutate(time_period = case_when(
@@ -439,3 +441,4 @@ ggplot(punt_summary_area, aes(x = as.numeric(year), y = percentage, fill = categ
         legend.title = element_text(size = 12),
         legend.text = element_text(size = 10))
 ```
+Interpretation: The main significant difference between how punting has changed over time is that the amount of fair catches has gone up and the number of short returns have gone down. However, the number of long returns hasn't had a meaningful change.
