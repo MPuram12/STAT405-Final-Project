@@ -1,0 +1,1010 @@
+---
+title: "Evolution of NFL Playstyles Over 25 Years"
+format: pdf
+author: "Theo Au-Yeung, Mani Puram, Gale Gai, Ken Soh"
+editor: visual
+---
+
+# Proposal One
+
+## Evolution of NFL Playstyles Over 25 Years
+
+This project explores the evolution of NFL playstyles from 1999 to 2024 using play-by-play data. By analyzing trends in team strategies, including fourth-down aggressiveness, and identifying the top-performing players and teams, we aim to uncover key shifts in game dynamics and decision-making throughout this period.
+
+## Graph Presentation
+
+```{r, include = FALSE}
+library(tidyverse)
+library(nflfastR)
+library(ggimage)
+library(gt)
+library(ggthemes)
+library(ggrepel)
+library(plotly)
+library(vip)
+library(dplyr)
+
+long_pbp <- load_pbp(1999:2024)
+
+
+long_pbp %>%
+  group_by(season) %>%
+  summarise(n = n())
+
+
+long_pbp %>%
+  group_by(play_type) %>%
+  summarise(n = n())
+
+
+qbs <- long_pbp %>%
+  filter(season_type == "REG", !is.na(epa)) %>%
+  group_by(id, name) %>%
+  dplyr::summarise(
+    epa = mean(qb_epa),
+    cpoe = mean(cpoe, na.rm = T),
+    n_dropbacks = sum(pass),
+    n_plays = n(),
+    team = last(posteam)
+  ) %>%
+  ungroup() %>%
+  filter(n_dropbacks > 10 & n_plays > 100)
+
+qbs <- qbs %>%
+  left_join(teams_colors_logos, by = c('team' = 'team_abbr'))
+
+offense <- long_pbp %>%
+  group_by(posteam) %>%
+  summarise(off_epa = mean(epa, na.rm = TRUE))
+
+
+defense <- long_pbp %>%
+  group_by(defteam) %>%
+  summarise(def_epa = mean(epa, na.rm = TRUE))
+
+logos <- teams_colors_logos %>% dplyr::select(team_abbr, team_logo_espn)
+```
+
+**EPA Chart**
+
+```{r, echo = FALSE}
+# Sample offense and defense data (replace with your actual data)
+epa_chart <- offense %>%
+  dplyr::inner_join(defense, by = c("posteam" = "defteam")) %>%
+  dplyr::inner_join(logos, by = c("posteam" = "team_abbr")) %>%
+  ggplot2::ggplot(aes(x = off_epa, y = def_epa, alpha = 0.2)) +
+  ggplot2::geom_abline(slope = -1.5, intercept = c(.4, .3, .2, .1, 0, -.1, -.2, -.3), alpha = .2) +
+  ggplot2::geom_hline(aes(yintercept = mean(off_epa)), color = "red", linetype = "dashed") +
+  ggplot2::geom_vline(aes(xintercept = mean(def_epa)), color = "red", linetype = "dashed") +
+  ggimage::geom_image(aes(image = team_logo_espn), size = 0.05, asp = 16 / 9, alpha = .1) +
+  theme_fivethirtyeight() +
+  theme(axis.title = element_text()) +
+  labs(
+    x = "Offense EPA/play",
+    y = "Defense EPA/play",
+    caption = "Data: @nflfastR",
+    title = "NFL Offensive and Defensive EPA per Play 1999-2024"
+  ) +
+  ggplot2::theme(
+    aspect.ratio = 9 / 16,
+    plot.title = ggplot2::element_text(size = 12, hjust = 0.5, face = "bold")
+  ) +
+  ggplot2::scale_y_reverse()
+
+epa_chart
+
+```
+
+EPA, or expected points added, is a commonly used advanced metric in football, measuring how well a team performs compared to their expectation on a play by play basis. EPA per Play is simply the mean of the offense's or defense's total EPA. An advantage of this stat is that it isn't too hard to interpret: since the mean of EPA per Play is 0, a positive value indicates a good play whereas a negative value indicates a bad play. In this chart, we plotted the offensive and defensive EPAs of all team from 1999-2024. Bottom right indicates a strong team, with a strong offensive EPA/play output, and a low defense EPA/play. We observe that the Baltimore Ravens from 1999-2024 have been the best defensive team in the league, which checks out given the star power they have possessed with players such as Ray Lewis, Ed Reed, and Terrell Suggs. The Las Vegas Raiders meanwhile, hold the worst defense across those seasons. The New England Patriots, to no surprise, hold the best offense in the NFL, which comes as no surprise given the dominance of Tom Brady and Rob Gronkowski in the early 2000s - 2010s. Meanwhile, the Chicago Bears, who have never quite had a franchise quarterback, hold the worse offense.
+
+```{r, include = FALSE}
+## Filtering Data for future plots
+first_pbp <- load_pbp(1999:2010)
+second_pbp <- load_pbp(2011:2024)
+
+# Getting just 4th downs
+fourth_downs_first <- first_pbp |> 
+  filter(down == 4, !is.na(play_type))
+
+fourth_downs_first <- fourth_downs_first %>%
+  filter(!is.na(yardline_100) & !is.na(ydstogo) & !is.na(wp))
+
+# See what usually happens on 4th down
+fourth_downs_first |> 
+  group_by(play_type) |> 
+  tally(sort = T) |> 
+  print(n = 10)
+
+# Creating an indicator variable
+fourth_downs_first <- fourth_downs_first |> 
+  mutate(went_for_it = ifelse(play_type %in% c("pass", "run"), 1, 0))
+
+##### Second ######
+
+# Getting just 4th downs
+fourth_downs_second <- second_pbp |> 
+  filter(down == 4, !is.na(play_type))
+
+fourth_downs_second <- fourth_downs_second %>%
+  filter(!is.na(yardline_100) & !is.na(ydstogo) & !is.na(wp))
+
+# See what usually happens on 4th down
+fourth_downs_second |> 
+  group_by(play_type) |> 
+  tally(sort = T) |> 
+  print(n = 10)
+
+# Creating an indicator variable
+fourth_downs_second <- fourth_downs_second |> 
+  mutate(went_for_it = ifelse(play_type %in% c("pass", "run"), 1, 0))
+
+
+
+#####Overall#####
+# Getting just 4th downs
+fourth_downs <- long_pbp |> 
+  filter(down == 4, !is.na(play_type))
+
+fourth_downs <- fourth_downs %>%
+  filter(!is.na(yardline_100) & !is.na(ydstogo) & !is.na(wp))
+
+# See what usually happens on 4th down
+fourth_downs |> 
+  group_by(play_type) |> 
+  tally(sort = T) |> 
+  print(n = 10)
+
+# Creating an indicator variable
+fourth_downs <- fourth_downs |> 
+  mutate(went_for_it = ifelse(play_type %in% c("pass", "run"), 1, 0))
+```
+
+**Fourth Down Barplots**
+
+Our next four graphs will count as one data visualization, as they are all bar plots that visualize fourth down statistics. We are first looking at fourth down decisions from 1999-2010, and will later compare to 2011-2024 data.
+
+```{r, echo = FALSE}
+
+ydstogo_summary <- fourth_downs_first %>%
+  group_by(ydstogo) %>%
+  summarise(count = n(),
+            went_for_it_rate = mean(went_for_it)) %>%
+  filter(count >= 5)
+
+barplot(ydstogo_summary$went_for_it_rate,
+        names.arg = ydstogo_summary$ydstogo,
+        col = heat.colors(length(ydstogo_summary$went_for_it_rate)), # Color fill
+        xlab = "Yards to Go",
+        ylab = "Went For It Rate",
+        main = "Went For It Rate by Yards to Go (1999-2010)",
+        border = "white")
+
+#####SECOND#####
+library("RColorBrewer")
+ydstogo_summary2 <- fourth_downs_second %>%
+  group_by(ydstogo) %>%
+  summarise(count = n(),
+            went_for_it_rate = mean(went_for_it)) %>%
+  filter(count >= 5)
+
+barplot(ydstogo_summary2$went_for_it_rate,
+        names.arg = ydstogo_summary2$ydstogo,
+        col = heat.colors(length(ydstogo_summary2$went_for_it_rate)), # Color fill
+        xlab = "Yards to Go",
+        ylab = "Went For It Rate",
+        main = "Went For It Rate by Yards to Go (2011-2024)",
+        border = "white")
+```
+
+In this graph we examine fourth down go for it rates by yards to go. Yards to go is simply the amount of yards needed to acquire a first down. For example, in a 4th down and 1 situation, the yards to go is 1. In the chart above, the results we observe are very understandable. The shorter the yards to go, the higher the went for it rate was. In other words, the less amount of yards teams needed to acquire a first down when they were on fourth down, the more likely they were to go for it. One interesting observation to note is the spikes in went for it rates on 4th and 10 and 4th and 30+. These results are most likely plays at the end of the game, where teams have no choice but to go for it to have a chance at winning or tying the game.
+
+In comparing 1999-2010 vs 2011-2024 data, we observe a larger went for it rate generally speaking. This seems to coincide with the arrival of analytics where teams are using analytics to identify spots where going for it is more valuable and the better option. There has been a massive increase in teams going for it on 4th downs and this chart certainly supports that.
+
+This next visualization gives us the went for it rates based on the yardline.
+
+```{r, echo = FALSE}
+yardline_summary <- fourth_downs_first %>%
+  group_by(yardline_100) %>%
+  summarise(count = n(),
+            went_for_it_rate = mean(went_for_it)) %>%
+  filter(count >= 5)
+
+# Create the barplot
+barplot(yardline_summary$went_for_it_rate,
+        names.arg = yardline_summary$yardline_100,
+        col = heat.colors(length(yardline_summary$went_for_it_rate)), # Color fill
+        xlab = "Yardline",
+        ylab = "Went For It Rate",
+        main = "Went For It Rate by Yardline (1999-2010)",
+        border = "white")
+
+
+####Second####
+
+yardline_summary2 <- fourth_downs_second %>%
+  group_by(yardline_100) %>%
+  summarise(count = n(),
+            went_for_it_rate = mean(went_for_it)) %>%
+  filter(count >= 5)
+
+# Create the barplot
+barplot(yardline_summary2$went_for_it_rate,
+        names.arg = yardline_summary2$yardline_100,
+        col = heat.colors(length(yardline_summary2$went_for_it_rate)), # Color fill
+        xlab = "Yardline",
+        ylab = "Went For It Rate",
+        main = "Went For It Rate by Yardline (2011-2024)",
+        border = "white")
+```
+
+What we see is once again very much expected. When teams are on the 1 yard line, right near the end zone, they are very likely to go for it on fourth down, whereas if they are on their own 1 yard line, as far away from the opponent's end zone as possible, they are very unlikely to go for it. The spike in the middle of the graph around 29 - 41 can likely be explained by the fact that they were not quite in field goal range while on fourth down, and so they went for it because they were far enough into opponent territory to want to keep going, but not quite far enough to settle for a field goal.
+
+The comparison between the two charts, spanning 1999--2010 and 2011--2024, reveals a clear evolution in NFL teams' fourth-down decision-making. In both periods, the went for it rate is highest near the goal line, where the scoring opportunity is imminent, but in more recent years, from 2011--2024, there's a noticeable increase in aggressive play around yardlines 30--40. This shift suggests teams are now more willing to take risks in the midfield, reflecting a data-driven approach that values fourth-down conversions as a critical opportunity to maintain possession and potentially score. The steep drop-off beyond midfield also highlights that while aggression has increased, teams remain cautious closer to their own end zone. Overall, the growing use of analytics appears to have emboldened teams, particularly in favorable field positions, resulting in more strategic risk-taking compared to the earlier period.
+
+This next graph provides us with went for it rates based on win probability. The win probability was provided to us via NFL Fast R, meaning it was provided within the data set we used.
+
+```{r, echo = FALSE}
+# Summarize the data
+wp_summary <- fourth_downs_first %>%
+  mutate(wp_rounded = round(wp, 2)) %>%
+  group_by(wp_rounded) %>%
+  summarise(count = n(),
+            went_for_it_rate = mean(went_for_it))
+
+# Create the barplot
+barplot(wp_summary$went_for_it_rate,
+        names.arg = wp_summary$wp_rounded,
+        col = heat.colors(length(wp_summary$went_for_it_rate)), # Color fill
+        xlab = "Win Probability (Rounded)",
+        ylab = "Went For It Rate",
+        main = "Went For It Rate by Win Probability (1999-2010)",
+        border = "white")
+
+####Second#####
+
+wp_summary2 <- fourth_downs_second %>%
+  mutate(wp_rounded = round(wp, 2)) %>%
+  group_by(wp_rounded) %>%
+  summarise(count = n(),
+            went_for_it_rate = mean(went_for_it))
+
+# Create the barplot
+barplot(wp_summary2$went_for_it_rate,
+        names.arg = wp_summary2$wp_rounded,
+        col = heat.colors(length(wp_summary2$went_for_it_rate)), # Color fill
+        xlab = "Win Probability (Rounded)",
+        ylab = "Went For It Rate",
+        main = "Went For It Rate by Win Probability (2011-2024)",
+        border = "white")
+```
+
+Again, pretty understandable results. The lower chances a team has to win, the more likely they are to go for it because 1) they have nothing to lose, and 2) they need to score and giving the ball away is pointless in those scenarios. On the other hand, teams that have a high chance of winning are more likely to not go for it and to play it safe, because they feel that they don't need to force anything and potentially put themselves in a dangerous spot that would allow their opponent to start a comeback.
+
+In both graphs, the highest "Went For It" rates occur when teams have very low win probabilities (near zero), reflecting desperation decisions when the chances of winning are slim. Over time, in the 2011-2024 period, there appears to be a slight increase in going for it at higher win probabilities (especially in the 0.34 to 0.52 range), suggesting that teams became more aggressive in situations where the game was more evenly balanced, compared to the earlier period. Additionally, the overall shape of both graphs remains similar, but the more recent years show a broader distribution of teams going for it even as their win probabilities are higher, reflecting a possible shift in strategic decision-making.
+
+**Fourth Down Logistic Modeling**
+
+This is our logistic model for fourth down probabiliites, modeling went for it rates with the yard line, yards to go, and win percentage
+
+```{r, echo = FALSE}
+log_fourth <- glm(went_for_it ~ yardline_100 + ydstogo + wp, 
+                  data = fourth_downs_first)
+
+# Getting the summary
+summary(log_fourth)
+
+# Getting the variable importance
+#vip(log_fourth)
+
+# Accounting for interaction effects
+log_fourth_co <- glm(went_for_it ~ (yardline_100 + ydstogo + wp)^2, 
+                     data = fourth_downs_first)
+
+summary(log_fourth_co)
+
+
+#####Second#####
+log_fourth_second<- glm(went_for_it ~ yardline_100 + ydstogo + wp, 
+                  data = fourth_downs_second)
+
+# Getting the summary
+summary(log_fourth_second)
+
+# Getting the variable importance
+#vip(log_fourth)
+
+# Accounting for interaction effects
+log_fourth_co_second <- glm(went_for_it ~ (yardline_100 + ydstogo + wp)^2, 
+                     data = fourth_downs_second)
+
+summary(log_fourth_co_second)
+
+
+```
+
+Intercept (0.4617): This is the baseline estimate for the probability of going for it on fourth down when all predictors are zero. In practical terms, this would be when the team is at its own end zone (yardline_100 = 0), needs 0 yards to go (ydstogo = 0), and has a 0% win probability (wp = 0).
+
+Yardline_100 (-0.002872): For every 1-yard increase in distance from the opponent's end zone, the probability of going for it on fourth down decreases by approximately 0.2872%. The further a team is from the opponent's end zone, the less likely they are to attempt a fourth-down conversion.
+
+Ydstogo (-0.009279): For every additional yard needed to achieve a first down, the probability of going for it on fourth down decreases by about 0.9279%. This indicates that the more yards needed, the less likely teams are to attempt a fourth down conversion.
+
+WP (-0.2638): For every 1% increase in win probability, the likelihood of going for it decreases by about 26.38%. Teams with a higher win probability tend to play more conservatively on fourth down.
+
+Teams are less likely to go for it on fourth down when they are further from the opponent's end zone, need more yards to achieve a first down, or have a higher win probability. All three factors significantly influence the decision-making process.
+
+**Fourth Down Line Chart**
+
+This next graph uses the results from this model to create a line graph that observes the probability of going for it based on each yard line.
+
+```{r, echo = FALSE}
+fourth_downs_first |> 
+  mutate(pred_prob = log_fourth$fitted.values) |> 
+  ggplot(aes(x = ydstogo)) +
+  geom_line(aes(y = pred_prob), color = "black", size = 2) +
+  geom_point(aes(y = went_for_it, color = ifelse(went_for_it == 1, "darkgreen", "darkred")), 
+             alpha = 0.3) +
+  scale_color_identity() +
+  theme_minimal() +
+  labs(x = "Yards to Go",
+       y = "Chance Offense Will Go For It (0-1)")
+```
+
+This graph displays the predicted probability of an offense going for it on fourth down versus the number of yards to go. As the yards to go increase, the chance that the offense will opt to go for it declines, which is consistent with conventional football strategy, where offenses are more likely to go for it on fourth down when they need fewer yards to convert. The green points represent instances where the team decided to go for it, and the red points signify when they did not. The clustering of red dots (decisions not to go for it) at a probability close to zero indicates a strong likelihood of punting or kicking for longer distances. Conversely, the green dots are more common when the predicted probability is higher but still seem scattered, suggesting situational variability even when the odds suggest going for it may not be highly probable.
+
+```{r, include = FALSE}
+## 4th down Modeling 
+fourth_downs_first <- fourth_downs_first |> 
+  mutate(pred_prob = log_fourth$fitted.values) |> 
+  mutate(fourth_oe = went_for_it - pred_prob)
+
+
+team_fourth_first <- fourth_downs_first |> 
+  filter(season >= 1999 & season <= 2010) |> 
+  group_by(posteam) |> 
+  summarise(count = n(),
+            exp_fourths = sum(pred_prob),
+            actual_fourths = sum(went_for_it),
+            fourths_oe = sum(fourth_oe)) |> 
+  left_join(teams_colors_logos, by = c("posteam" = "team_abbr"))
+
+# Getting fourth down go's over expected
+fourth_downs_first <- fourth_downs_first |> 
+  mutate(pred_prob = log_fourth$fitted.values) |> 
+  mutate(fourth_oe = went_for_it - pred_prob)
+
+
+team_fourth_first <- fourth_downs_first |> 
+  filter(season >= 1999 & season <= 2010) |> 
+  group_by(posteam) |> 
+  summarise(count = n(),
+            exp_fourths = sum(pred_prob),
+            actual_fourths = sum(went_for_it),
+            fourths_oe = sum(fourth_oe)) |> 
+  left_join(teams_colors_logos, by = c("posteam" = "team_abbr"))
+
+team_fourth_long <- team_fourth_first |> 
+  select(posteam, actual_fourths, exp_fourths, team_logo_espn) |> 
+  pivot_longer(cols = c(actual_fourths, exp_fourths),
+               names_to = "type",
+               values_to = "value")
+
+
+#####SECOND#####
+
+
+fourth_downs_second <- fourth_downs_second |> 
+  mutate(pred_prob = log_fourth_second$fitted.values) |> 
+  mutate(fourth_oe = went_for_it - pred_prob)
+
+
+team_fourth_second <- fourth_downs_second |> 
+  filter(season >= 2011 & season <= 2024) |> 
+  group_by(posteam) |> 
+  summarise(count = n(),
+            exp_fourths = sum(pred_prob),
+            actual_fourths = sum(went_for_it),
+            fourths_oe = sum(fourth_oe)) |> 
+  left_join(teams_colors_logos, by = c("posteam" = "team_abbr"))
+
+# Getting fourth down go's over expected
+fourth_downs_second <- fourth_downs_second |> 
+  mutate(pred_prob = log_fourth_second$fitted.values) |> 
+  mutate(fourth_oe = went_for_it - pred_prob)
+
+
+team_fourth_second <- fourth_downs_second |> 
+  filter(season >= 2011 & season <= 2024) |> 
+  group_by(posteam) |> 
+  summarise(count = n(),
+            exp_fourths = sum(pred_prob),
+            actual_fourths = sum(went_for_it),
+            fourths_oe = sum(fourth_oe)) |> 
+  left_join(teams_colors_logos, by = c("posteam" = "team_abbr"))
+
+team_fourth_long_second <- team_fourth_second |> 
+  select(posteam, actual_fourths, exp_fourths, team_logo_espn) |> 
+  pivot_longer(cols = c(actual_fourths, exp_fourths),
+               names_to = "type",
+               values_to = "value")
+
+
+```
+
+**4th down Actual vs Expected Jitter Plot**
+
+These next two chart plot each team and their actual vs expected go for it scenarios.
+
+```{r, echo = FALSE}
+# Create a blank plot
+ggplot(team_fourth_long, aes(x = posteam, y = value, color = type)) + 
+  geom_point(position = position_jitter(width = 0.2), size = 4) +
+  geom_image(aes(image = team_logo_espn), position = position_jitter(width = 0.2), size = 0.05, asp = 16/9) +
+  theme_fivethirtyeight() +
+  theme(axis.title = element_text()) +
+  labs(x = "Teams", 
+       y = "Number of 4th Downs", 
+       title = "Team 4th Down Actual vs Expected Go's", 
+       subtitle = "1999-2010") + 
+  scale_color_manual(values = c("actual_fourths" = "skyblue", "exp_fourths" = "lightgreen"), 
+                     name = "Type", 
+                     labels = c("Actual 4th Downs", "Expected 4th Downs")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "top")
+
+
+
+######2011-2024######
+ggplot(team_fourth_long_second, aes(x = posteam, y = value, color = type)) + 
+  geom_point(position = position_jitter(width = 0.2), size = 4) +
+  geom_image(aes(image = team_logo_espn), position = position_jitter(width = 0.2), size = 0.05, asp = 16/9) +
+  theme_fivethirtyeight() +
+  theme(axis.title = element_text()) +
+  labs(x = "Teams", 
+       y = "Number of 4th Downs", 
+       title = "Team 4th Down Actual vs Expected Go's", 
+       subtitle = "2011-2024") + 
+  scale_color_manual(values = c("actual_fourths" = "skyblue", "exp_fourths" = "lightgreen"), 
+                     name = "Type", 
+                     labels = c("Actual 4th Downs", "Expected 4th Downs")) +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "top")
+
+
+```
+
+The first graph visualizes NFL teams' actual fourth-down attempts versus expected fourth-down attempts between 1999 and 2010. Teams like BUF, BAL, and MIA show a balanced number of actual and expected fourth-down attempts, as indicated by the overlap of blue and green points. However, teams like TEN and NYJ show higher variance, with the actual fourth-down attempts either exceeding or falling short of the expected values. The scatter points are generally clustered between 160 and 240 fourth-down attempts, with most teams showing relatively similar trends. This period reflects a more conservative era, with teams typically staying closer to expectations.
+
+The second graph covers NFL fourth-down attempts from 2011 to 2024 and shows an overall upward trend in both actual and expected fourth-down attempts. The scatter points are now clustered higher on the y-axis, with several teams surpassing 300 fourth-down attempts, including KC, LAC, and GB. There is more variation across teams, indicating a divergence between actual fourth-down attempts and expectations, with some teams (e.g., NE and SF) being more aggressive or conservative than predicted. The gap between actual and expected attempts is more pronounced, suggesting evolving play strategies and perhaps greater willingness to take risks.
+
+When comparing both graphs, the most notable change is the increase in the number of fourth-down attempts from 1999-2010 to 2011-2024. In the earlier period, fourth-down decisions were generally more conservative, with most teams adhering closely to the expected numbers. However, by 2011-2024, there is a noticeable shift in teams' willingness to go for it on fourth down, as shown by the higher and more varied scatter points. This suggests a strategic evolution in the NFL, with teams becoming more aggressive in fourth-down decision-making, likely influenced by advancements in analytics and changing coaching philosophies. This change has contributed to an overall increase in offensive efficiency and more dynamic gameplay in the league.
+
+**Run Play Box Plot**
+
+This next chart is a boxplot that visualizes the yards gained on running plays in the NFL based on different run gaps and locations across the offensive line. The graph provides insights into the distribution of yards gained when running to the left end, left guard, left tackle, right end, right guard, and right tackle.
+
+```{r pressure, echo=FALSE}
+run_plays_with_gap = long_pbp[!is.na(long_pbp$run_gap) |!is.na(long_pbp$run_location), ]
+# Ensure data is numeric and factors are correctly set
+run_plays_with_gap$yards_gained <- as.numeric(run_plays_with_gap$yards_gained)
+run_plays_with_gap$run_gap <- as.factor(run_plays_with_gap$run_gap)
+run_plays_with_gap$run_location <- as.factor(run_plays_with_gap$run_location)
+
+# Create run_gap_location if not already done
+run_plays_with_gap$run_gap_location <- interaction(run_plays_with_gap$run_gap, run_plays_with_gap$run_location)
+
+# Calculate counts for each group
+counts <- table(run_plays_with_gap$run_gap_location)
+
+# Set minimum number of data points required
+min_count <- 100
+
+# Filter the data to include only groups with enough data points
+filtered_data <- run_plays_with_gap[run_plays_with_gap$run_gap_location %in% names(counts[counts >= min_count]), ]
+filtered_data$run_gap_location <- droplevels(filtered_data$run_gap_location)
+# Create the boxplot with filtered data
+boxplot(filtered_data$yards_gained ~ filtered_data$run_gap_location,
+                       main = 'Yards gained on each run play',
+                       xlab = 'Run gap and location', ylab = 'Yards gained',
+                       outline = FALSE, las = 2, cex.axis = 0.7)  # Adjust cex.axis to control x-axis label size
+
+# Get the counts for filtered data
+filtered_counts <- table(filtered_data$run_gap_location)
+
+# Rotate labels and move xlabel further away
+par(mar = c(7, 4, 4, 2) + 0.1)
+
+#boxplot_obj
+```
+
+There is not a huge statistically significant difference in the effeciencies of run plays in different gaps. While inside runs to the tackle and guard are generally safer (small potential for a big loss), they also have a lower potential for a big gain. On the other hand, run plays to the outside have a much larger potential for gain but also a larger potential for a big loss. There's also no notable difference between running to the left and right. The graph shows that running plays towards the left end have the highest variability in yards gained, with the widest interquartile range and the longest upper whisker, indicating more explosive plays compared to other gaps. Runs through the guard positions, both left and right, show more consistency, with a tighter distribution of yards gained and lower maximum gains. These runs have more modest median yardage compared to the others. Right tackle runs appear to perform similarly to left tackle runs, with moderate variability and a slight potential for higher yardage compared to runs through the guards. Overall, edge runs (left and right ends) seem to yield more significant gains and greater volatility, while inside runs offer steadier but less explosive outcomes.
+
+**Strength of Team Heat Map**
+
+```{r, echo = FALSE}
+library(nflreadr)
+data <- load_schedules(seasons = 1999:2023) |>                                              
+  filter(game_type == "REG")
+
+data$home_team <- paste0(data$home_team, " ", data$season)
+data$away_team <- paste0(data$away_team, " ", data$season)
+
+team_matrix_home <- model.matrix(~ home_team, data = data)
+team_matrix_away <- model.matrix(~ away_team, data = data)
+team_matrix <- team_matrix_home - team_matrix_away  
+
+team_data <- as.data.frame(team_matrix[, -1])
+names(team_data) <- sort(unique(data$home_team))[-1]
+
+linear_model <- lm(data$result ~ ., data = team_data)
+
+team_strength <- data.frame(
+  team = names(coef(linear_model))[-1],
+  strength = coef(linear_model)[-1]
+)
+
+logistic_model <- glm(data$result > 0 ~ ., data = team_data, family = binomial())
+
+team_strength_2 <- data.frame(
+  team = names(coef(logistic_model))[-1],
+  strength = coef(logistic_model)[-1]
+)
+team_strength_ordered = team_strength %>% arrange(desc(strength))
+team_strength_ordered_2 = team_strength_2 %>% arrange(desc(strength))
+
+# Step 1: Extract the top 15 teams from both ordered dataframes
+top_15_model_1 <- team_strength_ordered %>% top_n(15, strength)
+top_15_model_2 <- team_strength_ordered_2 %>% top_n(15, strength)
+
+# Step 2: Combine these teams into one dataframe
+combined_teams <- full_join(top_15_model_1, top_15_model_2, by = "team", suffix = c("_model_1", "_model_2"))
+
+# Step 3: Fill NA values with 0 or any appropriate value
+combined_teams <- combined_teams %>%
+  mutate(
+    strength_model_1 = ifelse(is.na(strength_model_1), 0, strength_model_1),
+    strength_model_2 = ifelse(is.na(strength_model_2), 0, strength_model_2)
+  )
+
+#combined_teams
+
+n <- nrow(combined_teams)
+strength_diff_model_1 <- outer(combined_teams$strength_model_1, combined_teams$strength_model_1, "-")
+strength_diff_model_2 <- outer(combined_teams$strength_model_2, combined_teams$strength_model_2, "-")
+
+create_heatmap_with_legend <- function(matrix, title) {
+  filled.contour(
+    x = 1:n, y = 1:n, z = t(matrix)[, n:1],
+    color.palette = heat.colors,
+    plot.title = title(main = title),
+    plot.axes = {
+      axis(1, at = 1:n, labels = combined_teams$team_season, las = 2, cex.axis = 0.7)
+      axis(2, at = 1:n, labels = rev(combined_teams$team_season), las = 2, cex.axis = 0.7)
+    },
+    xlab = "Teams", ylab = "Teams"
+  )
+}
+
+# Plot heatmaps
+par(mfrow = c(1, 2))  # Plot side by side
+create_heatmap_with_legend(strength_diff_model_1, "Strength Difference Using Metric 1")
+create_heatmap_with_legend(strength_diff_model_2, "Strength Difference Using Metric 2")
+# team_strength_2 <- data.frame(
+#   team = names(coef(logistic_model))[-1],
+#   strength = coef(logistic_model)[-1]
+# )
+# 
+# 
+# win_percentage <- teams_data <- data.frame(
+#   team = c("`BAL 2019`", "`NE 2007`", "`SEA 2013`", "`PIT 2004`", "`GB 2011`", "`DEN 2013`", "`NO 2019`", "`KC 2019`", "`STL 2001`", "`SD 2010`", "`SF 2019`", "`CAR 2013`", "`ATL 2016`", "`BUF 2021`", "`LA 2021`", "`OAK 2016`"),
+#   win_pct = c(14/16, 1, 13/16, 15/16, 15/16, 13/16, 13/16, 12/16, 14/16, 9/16, 13/16, 12/16, 11/16, 11/17, 12/17, 12/16)
+# )
+# 
+# merged_data <- merge(team_strength, win_percentage, by = c("team"))
+# plot(merged_data$strength, merged_data$win_pct, xlab = "Estimated Strength", ylab = "Win Percentage", main = "Estimated Strength vs Win Percentage", pch = 19)
+# abline(lm(win_pct ~ strength, data = merged_data), col = "red")
+# 
+# text(
+#   merged_data$strength,
+#   merged_data$win_pct,
+#   labels = merged_data$team,
+#   pos = 1,
+#   cex = 0.3,
+#   col = "darkred"
+# )
+
+```
+
+We created two different metrics to assess the strengths of teams in the years 1999 to 2023, and we took the 15 strongest teams using each metric. Then, combining those lists we got a total of 23 teams, and calculated the difference in strengths between every combination of those teams using each metric. We found that in general metric 1 gives more consistent results with regards to the head to head results.
+
+**QB EPA - CPOE Radar Chart**
+
+This circular barplot displays the performances of NFL quarterbacks with high dropbacks and plays, focusing on two key metrics: Expected Points Added (EPA) and Completion Percentage Over Expected (CPOE). The bars represent each quarterback's EPA, while the fill color corresponds to their CPOE. Team logos are included for easy identification of each quarterback's respective team.
+
+```{r, echo = FALSE}
+
+qbs <- long_pbp %>%
+  filter(season_type == "REG", !is.na(epa)) %>%
+  group_by(id, name) %>%
+  dplyr::summarise(
+    epa = mean(qb_epa),
+    cpoe = mean(cpoe, na.rm = T),
+    n_dropbacks = sum(pass),
+    n_plays = n(),
+    team = last(posteam)
+  ) %>%
+  ungroup() %>%
+  filter(n_dropbacks > 1000 & n_plays > 1000)
+
+qbs <- qbs %>%
+  left_join(teams_colors_logos, by = c('team' = 'team_abbr'))
+
+qbs <- qbs %>% 
+  filter(epa >= .1459)
+
+
+
+# Load necessary libraries
+library(ggplot2)
+library(ggimage)
+library(ggthemes)  # For theme_fivethirtyeight
+
+# Circular Barplot with team logos, better EPA legend, and CPOE legend
+ggplot(qbs, aes(x = reorder(name, epa), y = epa, fill = cpoe)) +
+  geom_bar(stat = "identity", show.legend = TRUE) +  # Set show.legend = TRUE for CPOE legend
+  coord_polar() +
+  geom_image(aes(image = team_logo_espn), size = 0.08, by = "width", nudge_y = 0.05) +  # Adjust size and position as needed
+  scale_fill_gradient(low = "lightblue", high = "darkblue", name = "CPOE") +  # Gradient for CPOE with legend
+  theme_fivethirtyeight() +
+  theme(axis.title = element_text(),  # Ensure axis title visibility
+        axis.text.x = element_text(angle = 90, hjust = 1),
+        legend.position = "right") +  # Position legend on the right
+  labs(title = "Quarterback Performances",
+       x = "", y = "EPA",
+       subtitle = "Filtered QBs with high dropbacks and plays",
+       fill = "EPA/CPOE Performance")  # Custom label for legend
+```
+
+The graph highlights the top-performing quarterbacks in terms of EPA, with Peyton Manning standing out significantly at the top, showing the highest EPA among the selected players. The color gradient also suggests that Manning had a relatively high CPOE, which is associated with better passing accuracy. Other notable quarterbacks such as Josh Allen and Lamar Jackson show competitive EPA values but with slightly lower CPOE as indicated by lighter shades. On the lower end of the spectrum, quarterbacks like Aaron Rodgers and Tom Brady have lesser EPA, but still maintain solid performance as shown by their moderate CPOE values. This graph allows for a quick visual comparison of quarterbacks efficiency and accuracy relative to each other, providing a clear picture of their offensive contributions during the season.
+
+**Dumbbell Plot - RYOE**
+
+This dot plot compares the actual yards per carry (YPC) versus the expected YPC for several prominent NFL running backs. The actual YPC (dark blue dots) shows the players' real performance on the field, while the expected YPC (light blue dots) estimates what each player's YPC should have been based on various factors such as play conditions and defensive alignments. The horizontal lines between the dots represent the difference between actual and expected YPC.
+
+```{r, echo = FALSE}
+##################### rushing yards over expected ################
+library(caret)
+library(xgboost)
+library(ranger)
+# Getting just rushes
+rush_attempts <- long_pbp |> 
+  filter(rush_attempt == 1, qb_scramble == 0, 
+         qb_dropback == 0, !is.na(yards_gained))
+
+# Making defensive yards per carry
+def_ypc <- rush_attempts |> 
+  filter(!is.na(defteam)) |> 
+  group_by(season, defteam) |> 
+  summarise(def_ypc = mean(yards_gained))
+
+rush_attempts <- rush_attempts |> 
+  left_join(def_ypc, by = c("season", "defteam"))
+
+# Getting the join dataset ready
+rushing_data_join <- rush_attempts |> 
+  select(label = yards_gained, yardline_100, quarter_seconds_remaining, half_seconds_remaining,
+         game_seconds_remaining, qtr, down, ydstogo, shotgun, no_huddle,
+         ep, wp, def_ypc, rusher_player_name, posteam, defteam) |> 
+  filter(!is.na(label)) |> 
+  filter(!is.na(down))
+
+rushes <- rushing_data_join |> 
+  select(-rusher_player_name, -posteam, -defteam)
+
+str(rushes)
+
+# Creating factors
+rushes$down <- as.factor(rushes$down)
+rushes$shotgun <- as.factor(rushes$shotgun)
+rushes$no_huddle <- as.factor(rushes$no_huddle)
+
+# One hot encoding
+dmy <- dummyVars(" ~ .", data = rushes)
+rushing_model_data <- data.frame(predict(dmy, newdata = rushes))
+
+colSums(is.na(rushing_model_data))
+
+# Making train and test datasets
+smp_size <- floor(0.50 * nrow(rushing_model_data))
+set.seed(2011) #go lions
+ind <- sample(seq_len(nrow(rushing_model_data)), size = smp_size)
+train <- as.matrix(rushing_model_data[ind, ])
+test <- as.matrix(rushing_model_data[-ind, ])
+
+dim(train)
+colnames(train)
+
+# Making the model
+ryoe_model <-
+  xgboost(
+    data = train[, 2:18],
+    label = train[, 1],
+    nrounds = 100,
+    objective = "reg:squarederror",
+    early_stopping_rounds = 3,
+    max_depth = 6,
+    eta = .25
+  )   
+library(vip)
+#vip(ryoe_model)
+library(DiagrammeR)
+xgb.plot.tree(model = ryoe_model, trees = 1)
+
+pred_xgb <- predict(ryoe_model, test[, 2:18])
+
+# Seeing our RMSE
+yhat <- pred_xgb
+y <- test[, 1]
+postResample(yhat, y)
+
+rushing_preds <- as.data.frame(
+  matrix(predict(ryoe_model, as.matrix(rushing_model_data %>% select(-label))))
+) %>%
+  dplyr::rename(exp_yards = V1)
+
+# Step 1: Add predicted (expected) rush yards to the original data
+rushing_data_join <- rushing_data_join %>%
+  mutate(exp_yards = predict(ryoe_model, as.matrix(rushing_model_data %>% select(-label)))) %>%
+  mutate(ryoe_per_carry = label - exp_yards)  # Calculate RYOE per carry
+
+# Step 2: Group by player and calculate RYOE per carry
+ryoe_by_player <- rushing_data_join %>%
+  group_by(rusher_player_name) %>%
+  summarise(
+    total_rushes = n(),
+    total_rush_yards = sum(label),  
+    ypc = sum(label) / n(),# Actual rush yards
+    total_exp_yards = sum(exp_yards), # Expected rush yards,
+    exp_ypc = total_exp_yards / total_rushes, 
+    total_ryoe = sum(ryoe_per_carry),        # Total RYOE
+    avg_ryoe_per_carry = ypc - exp_ypc  # Average RYOE per carry
+  ) %>%
+  arrange(desc(avg_ryoe_per_carry)) %>%   # Sort by best RYOE per carry
+  filter(total_rushes > 1000) %>% 
+  select(rusher_player_name, total_rushes, total_rush_yards, ypc, exp_ypc, total_exp_yards, total_ryoe, avg_ryoe_per_carry) %>% 
+  filter(avg_ryoe_per_carry > .320)
+
+full_names <- c(
+  "J.Charles" = "Jamaal Charles",
+  "N.Chubb" = "Nick Chubb",
+  "A.Jones" = "Aaron Jones",
+  "M.Faulk" = "Marshall Faulk",
+  "T.Barber" = "Tiki Barber",
+  "J.Taylor" = "Jonathan Taylor",
+  "B.Jacobs" = "Brandon Jacobs",
+  "F.Taylor" = "Fred Taylor",
+  "B.Westbrook" = "Brian Westbrook",
+  "C.McCaffrey" = "Christian McCaffrey",
+  "D.Henry" = "Derrick Henry",
+  "A.Bradshaw" = "Ahmad Bradshaw",
+  "A.Foster" = "Arian Foster",
+  "A.Peterson" = "Adrian Peterson",
+  "C.Dillon" = "Corey Dillon"
+)
+
+ryoe_by_player$rusher_player_name <- full_names
+
+# Create Dumbbell Plot
+ggplot(ryoe_by_player, aes(y = reorder(rusher_player_name, exp_ypc))) + 
+  geom_dumbbell(aes(x = exp_ypc, xend = ypc), 
+                colour = "gray", size = 1.5) +
+  geom_point(aes(x = exp_ypc, color = "Expected YPC"), size = 3) +
+  geom_point(aes(x = ypc, color = "Actual YPC"), size = 3) +
+  scale_color_manual(values = c("Expected YPC" = "lightblue", "Actual YPC" = "#00205B"),
+                     name = "Yards per Carry") +
+  theme_fivethirtyeight() +
+   theme(panel.grid.major.y = element_blank(),
+        legend.position = "bottom",
+        legend.title = element_text(size = 10),
+        legend.text = element_text(size = 8)) +
+  theme(axis.title = element_text()) +
+  labs(title = "Actual YPC vs Expected YPC by Player",
+       subtitle = "Difference Between Actual and Expected Yards Per Carry",
+       x = "Yards per Carry", y = "Player")
+```
+
+The plot highlights the over- and under-performance of these players relative to expectations. Nick Chubb and Jamaal Charles, for instance, greatly exceed their expected YPC, with actual values significantly higher than predicted. This suggests their ability to consistently break tackles or create yardage beyond what the play design allows. On the other hand, players like Corey Dillon and Brandon Jacobs have actual YPCs closer to or below their expected values, indicating they performed closer to expectations or slightly underachieved based on situational factors.
+
+2D Density Map
+
+This graph is a 2D density plot illustrating the relationship between **Average Air Yards per Play** (on the horizontal axis) and **Completion Percentage** (on the vertical axis). The color gradients, ranging from dark purple to bright yellow, represent the density or frequency of observations at each combination of these two variables. Areas with higher density are shown in yellow, indicating a greater concentration of data points, while the darker regions represent lower density.
+
+```{r, echo = FALSE}
+all_passes <- long_pbp %>% 
+  filter(play_type == 'pass' &
+         !is.na(passer_id)) %>%
+  mutate(
+    Complete = complete_pass == "1", TRUE, FALSE
+  )
+
+summary_by_passer <- all_passes %>%
+  group_by(passer_id) %>%
+  summarise(
+    passer = first(passer),  # Get the passer corresponding to each passer_id
+    num_plays = n(),
+    total_air_yards = sum(air_yards, na.rm = TRUE),
+    completion_percentage = mean(Complete) * 100
+  )
+
+summary_by_passer <- summary_by_passer %>%
+  mutate(average_air_yards_per_play = total_air_yards / num_plays) %>%
+  filter(num_plays >= 50)
+
+ggplot(summary_by_passer, aes(x = average_air_yards_per_play, y = completion_percentage)) +
+  geom_density_2d_filled() +  # Add filled 2D density contours
+  labs(
+    title = "2D Density Plot of Average Air Yards per Play vs. Completion Percentage",
+    x = "Average Air Yards per Play",
+    y = "Completion Percentage"
+  ) +
+  theme_minimal()
+```
+
+The plot reveals two prominent clusters of activity. The first cluster appears around an Average Air Yards per Play\*\* of 5 to 10 yards and a Completion Percentage of 50 to 60%, suggesting a significant number of plays occur within this range. This region likely represents a sweet spot for passes, where moderate-distance throws result in reasonably high completion rates. A smaller but notable cluster can also be seen in the 0 to 3-yard range, paired with completion percentages between 40 and 55%, indicating that shorter passes, while more frequent, tend to have lower completion efficiency. The density peak in the 7 to 10-yard range suggests that, for this data set, passes traveling 7 to 10 yards through the air tend to yield higher completion percentages compared to shorter throws. This may point to the fact that intermediate passing attempts strike a balance between risk and reward, offering a greater chance of success than very short or long throws.
+
+**Tom Brady Receiver Custer Plot**
+
+This scatter plot highlights the relationship between Air Yards per Reception (on the horizontal axis) and Yards After Catch per Reception (on the vertical axis) for players at different positions: Running Backs (RB), Tight Ends (TE), and Wide Receivers (WR). The data points are color-coded by position, with running backs in red, tight ends in green, and wide receivers in blue. The shaded regions around each position group help emphasize clusters of players that share similar statistical profiles, providing insight into their typical play styles.
+
+```{r, echo = FALSE}
+brady_passes <- long_pbp %>%
+  filter(passer == 'T.Brady' & 
+         play_type != 'no_play' & 
+         incomplete_pass != 1 & 
+         interception != 1 & 
+         !is.na(air_yards) & 
+         !is.na(yards_after_catch))
+
+
+tbrady_passes <- tbrady_passes %>%
+  arrange(desc(receiver_id))
+
+top_receivers <- tbrady_passes %>%
+  group_by(receiver_id, receiver) %>%  # Group by receiver_id and receiver
+  summarise(
+    total_yards_gained = sum(yards_gained, na.rm = TRUE),  # Sum yards_gained
+    num_recs = n(),  # Count of plays for each receiver
+    total_air_yards = sum(air_yards, na.rm = TRUE),  # Sum of air yards
+    total_yards_after_catch = sum(yards_after_catch, na.rm = TRUE),  # Sum of yards after catch
+    .groups = 'drop'  # Ungroup after summarizing
+  )
+
+top_receivers <- top_receivers %>%
+  arrange(desc(total_yards_gained)) %>%  # Sort in descending order
+  slice_head(n = 20)  # Take the top 20 rows
+
+player_positions <- data.frame(
+  receiver = c("R.Gronkowski", "J.Edelman", "W.Welker", "M.Evans", "C.Godwin", 
+               "J.White", "R.Moss", "D.Amendola", "A.Hernandez", "C.Hogan", 
+               "D.Branch", "B.Watson", "B.LaFell", "L.Fournette", "K.Faulk", 
+               "S.Vereen", "B.Cooks", "A.Brown", "D.Woodhead", "B.Lloyd"),
+  position = c("TE", "WR", "WR", "WR", "WR", 
+               "RB", "WR", "WR", "TE", "WR", 
+               "WR", "TE", "WR", "RB", "RB", 
+               "RB", "WR", "WR", "RB", "WR")
+)
+
+# Append the positions to the top_receivers dataframe
+top_receivers <- top_receivers %>%
+  left_join(player_positions, by = "receiver")
+
+top_receivers <- top_receivers %>%
+  mutate(
+    air_yards_per_rec = total_air_yards / num_recs,
+    yards_after_catch_per_rec = total_yards_after_catch / num_recs
+  )
+
+top_receivers <- top_receivers %>%
+  filter(!is.na(air_yards_per_rec) & !is.na(yards_after_catch_per_rec))
+
+ggplot(top_receivers, aes(x = air_yards_per_rec, 
+                           y = yards_after_catch_per_rec, 
+                           label = receiver, 
+                           color = position)) +
+  geom_point(size = 3, alpha = 0.7) +
+  geom_text(vjust = -0.5, hjust = 0.5, size = 3.5) +
+  geom_encircle(aes(fill = position), 
+                alpha = 0.1, 
+                color = NA, 
+                expand = 0.08) +
+  labs(
+    title = "Air Yards and Yards After Catch per Reception",
+    x = "Air Yards per Reception",
+    y = "Yards After Catch per Reception"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "right")
+
+```
+
+Of Tom Brady's receivers, the running backs tended to have more yards after catch per reception, and the least air yards per reception. However, his tight ends and wide receivers tended to have most of their yards in the air and only a little after the catch. Some of his receivers were especially good at getting a lot of air yards.
+
+**Time Series - Comparison of the percentage of runs compared to pass in the red zone, comparing from before and after 2010.**
+
+This line graph illustrates the change in the proportion of pass and run plays in football across two time periods: 1999-2010 and 2011-2024. The green line represents the percentage of passing plays, while the red line indicates the percentage of running plays. The graph uses triangle markers at both time intervals to show the shift in offensive strategy over time.
+
+```{r, include = FALSE}
+
+first_red_zone <- first_pbp %>%  
+  filter(ydstogo <= 20, !is.na(play_type), !play_type %in% c("extra_point", "kickoff", "no_play", "qb_kneel","qb_spike")) %>% 
+  select(ydstogo, play_type)
+  
+
+second_red_zone <- second_pbp %>%  
+  filter(ydstogo <= 20, !is.na(play_type), !play_type %in% c("extra_point", "kickoff", "no_play", "qb_kneel","qb_spike")) %>% 
+  select(ydstogo, play_type)
+
+first_red_zone_summary <- first_red_zone %>%
+  group_by(play_type) %>% 
+  summarise(percentage = n() / nrow(first_red_zone) * 100)
+  
+second_red_zone_summary <- second_red_zone %>%
+  group_by(play_type) %>% 
+  summarise(percentage = n() / nrow(first_red_zone) * 100)
+
+red_zone <- data.frame(
+  Period = rep(c("1999-2010", "2010-2024"), each = 2),
+  PlayType = rep(c("Pass", "Run"), times = 2),
+  Percentage = c(first_red_zone_summary$percentage[2], first_red_zone_summary$percentage[4], second_red_zone_summary$percentage[2], second_red_zone_summary$percentage[4]) # respective percentages
+)
+```
+
+```{r}
+# Plotting the data
+ggplot(red_zone, aes(x = Period, y = Percentage, group = PlayType, color = PlayType)) + 
+  geom_line() +  # Connects points with a line per group
+  geom_point(shape = 17, size = 3) + # Shows the individual points
+  theme_fivethirtyeight() +
+  theme(axis.title = element_text()) + 
+  labs(title = "Change in Pass and Run Plays", x = "Time Period", y = "Percentage") +
+  scale_color_manual(name = "", 
+                     values = c("Pass" = "#00ba38", "Run" = "#f8766d")) +
+  theme(panel.grid.minor = element_blank())
+```
+
+The data shows a clear trend toward an increase in passing plays. In the earlier period (1999-2010), passing plays made up just over 50%, but by the 2010-2024 period, this figure has risen to around 60%. Conversely, the percentage of running plays has slightly declined, dropping from around 40% to closer to 35%. This trend reflects a broader shift in football strategy, where teams are increasingly prioritizing passing offenses, likely due to advancements in passing efficiency, rule changes favoring the passing game, and the growing emphasis on explosive aerial attacks.
+
+Histogram - Passing Yards
+
+The provided histogram illustrates the distribution of total passing yards accumulated by NFL teams during a specific season. The horizontal axis represents the total passing yards, while the vertical axis indicates the frequency of teams falling within each range of passing yards.
+
+```{r}
+# Load necessary libraries
+library(nflfastR)
+library(ggplot2)
+library(dplyr)
+
+# Load play-by-play data for a single season (2022 as an example)
+
+# Filter for passing plays and aggregate total passing yards by team
+team_passing_yards <- long_pbp %>%
+  filter(pass == 1) %>%
+  group_by(posteam) %>%
+  summarise(
+    total_passing_yards = sum(passing_yards, na.rm = TRUE),
+    pass_attempts = n()
+  ) %>%
+  filter(pass_attempts >= 2 & !is.na(posteam)) 
+
+ggplot(team_passing_yards, aes(x = total_passing_yards)) +
+  geom_histogram(binwidth = 5000, fill = "skyblue", color = "black") +
+  labs(
+    title = "Distribution of Total Passing Yards by Team",
+    x = "Total Passing Yards",
+    y = "Frequency"
+  ) +
+  theme_minimal()
+
+
+```
+
+The histogram suggests that while a majority of teams fall within a certain range of passing yards (around 90,000 to 110,000), there is a significant spread in passing yard totals. This indicates a diverse landscape of offensive strategies and execution across the league. The rightward skew suggests that a few teams consistently outperform the majority in terms of passing yards.
